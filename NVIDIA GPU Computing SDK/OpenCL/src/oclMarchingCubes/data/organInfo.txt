@@ -1,8 +1,0 @@
-voxelSize[512 512 20]
-voxelSpace[0.779297 0.779297 4.94444466]
-pixel: float[0.0 1.0]
-physical position:
-UpperLeft_X	-169.574997
-UpperLeft_Y	-52.0999985
-UpperLeft_Z	224.460007
-
