@@ -1,0 +1,7 @@
+*.exe
+*.db
+*.dat
+*.obj
+*.ilk
+*.pdb
+*.VC.VC.opendb
