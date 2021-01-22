@@ -68,14 +68,14 @@ classifyVoxel(__global uint* voxelVerts, __global uint *voxelOccupied, __read_on
 
     // calculate flag indicating if each vertex is inside or outside isosurface
     int cubeindex;
-	cubeindex =  (field[0] < isoValue); 
-	cubeindex += (field[1] < isoValue)*2; 
-	cubeindex += (field[2] < isoValue)*4; 
-	cubeindex += (field[3] < isoValue)*8; 
-	cubeindex += (field[4] < isoValue)*16; 
-	cubeindex += (field[5] < isoValue)*32; 
-	cubeindex += (field[6] < isoValue)*64; 
-	cubeindex += (field[7] < isoValue)*128;
+	cubeindex =  (field[0] > isoValue); 
+	cubeindex += (field[1] > isoValue)*2; 
+	cubeindex += (field[2] > isoValue)*4; 
+	cubeindex += (field[3] > isoValue)*8; 
+	cubeindex += (field[4] > isoValue)*16; 
+	cubeindex += (field[5] > isoValue)*32; 
+	cubeindex += (field[6] > isoValue)*64; 
+	cubeindex += (field[7] > isoValue)*128;
 
     // read number of vertices from texture
     uint numVerts = read_imageui(numVertsTex, tableSampler, (int2)(cubeindex,0)).x;
@@ -184,14 +184,14 @@ generateTriangles2(__global float4 *pos, __global float4 *norm, __global uint *c
 
     // recalculate flag
     int cubeindex;
-	cubeindex =  (field[0] < isoValue); 
-	cubeindex += (field[1] < isoValue)*2; 
-	cubeindex += (field[2] < isoValue)*4; 
-	cubeindex += (field[3] < isoValue)*8; 
-	cubeindex += (field[4] < isoValue)*16; 
-	cubeindex += (field[5] < isoValue)*32; 
-	cubeindex += (field[6] < isoValue)*64; 
-	cubeindex += (field[7] < isoValue)*128;
+	cubeindex =  (field[0] > isoValue); 
+	cubeindex += (field[1] > isoValue)*2; 
+	cubeindex += (field[2] > isoValue)*4; 
+	cubeindex += (field[3] > isoValue)*8; 
+	cubeindex += (field[4] > isoValue)*16; 
+	cubeindex += (field[5] > isoValue)*32; 
+	cubeindex += (field[6] > isoValue)*64; 
+	cubeindex += (field[7] > isoValue)*128;
 
 	// find the vertices where the surface intersects the cube 
 	__local float4 vertlist[12*NTHREADS];
@@ -251,16 +251,16 @@ generateTriangles2(__global float4 *pos, __global float4 *norm, __global uint *c
 		vHash[2] = edgeHash[(edge*NTHREADS) + tid];
 
         // calculate triangle surface normal
-        float4 n = calcNormal(v[0], v[1], v[2]); 
+        float4 n = calcNormal(v[1], v[0], v[2]); 
 
         if (index < (maxVerts - 3)) {
-            pos[index] = v[0];
+            pos[index] = v[1];
             norm[index] = n;
-			vertexHash[index] = vHash[0];
+			vertexHash[index] = vHash[1];
 
-            pos[index+1] = v[1];
+            pos[index+1] = v[0];
             norm[index+1] = n;
-			vertexHash[index+1] = vHash[1];
+			vertexHash[index+1] = vHash[0];
 
             pos[index+2] = v[2];
             norm[index+2] = n;
