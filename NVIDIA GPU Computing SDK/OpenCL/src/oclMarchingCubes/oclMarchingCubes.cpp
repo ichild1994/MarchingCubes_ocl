@@ -709,7 +709,7 @@ initMC(int argc, char** argv)
 	// compute translate and scale info for MC
 	voxelSize[0] = 0.779297;
 	voxelSize[1] = 0.779297;
-	voxelSize[2] = 4.94444466;
+	voxelSize[2] = 0.779297;// 4.94444466;
 	float sx = 2.0f / (gridSize[0] * voxelSize[0]);
 	float sy = 2.0f / (gridSize[1] * voxelSize[1]);
 	if (sx < sy) mc_scale = sx;
@@ -1201,7 +1201,7 @@ display()
 		glRotatef(mc_rotate[1], 0.0, 1.0, 0.0);
 		glRotatef(180.0, 0, 1.0, 0); // heading
 
-		glPolygonMode(GL_FRONT_AND_BACK, wireframe? GL_LINE : GL_FILL);
+		glPolygonMode(GL_FRONT, wireframe? GL_LINE : GL_FILL);
 		if (lighting) {
 			glEnable(GL_LIGHTING);
 		}

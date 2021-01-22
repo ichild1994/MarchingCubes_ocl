@@ -3,7 +3,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>--gridx=512 --gridy=512 --gridz=20 --file=data\resData2.dat</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>--gridx=512 --gridy=512 --gridz=127 --file=data\OrganImageData-inter.dat</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LocalDebuggerCommandArguments>--gridx=512 --gridy=512 --gridz=8 --file=data\resData.dat</LocalDebuggerCommandArguments>

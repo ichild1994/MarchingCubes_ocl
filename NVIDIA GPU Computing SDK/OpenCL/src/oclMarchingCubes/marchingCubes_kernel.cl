@@ -251,7 +251,7 @@ generateTriangles2(__global float4 *pos, __global float4 *norm, __global uint *c
 		vHash[2] = edgeHash[(edge*NTHREADS) + tid];
 
         // calculate triangle surface normal
-        float4 n = calcNormal(v[0], v[1], v[2]);
+        float4 n = calcNormal(v[0], v[1], v[2]); 
 
         if (index < (maxVerts - 3)) {
             pos[index] = v[0];
