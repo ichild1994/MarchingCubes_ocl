@@ -1,1 +1,32 @@
-﻿  oclMarchingCubes_vs2010.vcxproj -> G:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\src\oclMarchingCubes\..\..\bin\Win64\Release\oclMarchingCubes.exe
+﻿  oclMarchingCubes.cpp
+g:\oclmarchingcubes\nvidia gpu computing sdk\opencl\src\oclmarchingcubes\ScanApple.h(30): warning C4005: “min”: 宏重定义
+  C:\Program Files (x86)\Windows Kits\8.1\Include\shared\minwindef.h(197): note: 参见“min”的前一个定义
+  Note: including windows.h
+  Note: including math.h
+  Note: including assert.h
+  Note: including shrUtils.h
+  Note: including opencl.h
+  Note: including windows.h
+  Note: including math.h
+  Note: including assert.h
+  Note: including time.h
+oclMarchingCubes.cpp(431): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.10240.0\ucrt\stdio.h(1769): note: 参见“sprintf”的声明
+oclMarchingCubes.cpp(448): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.10240.0\ucrt\stdio.h(205): note: 参见“fopen”的声明
+oclMarchingCubes.cpp(465): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.10240.0\ucrt\stdio.h(205): note: 参见“fopen”的声明
+oclMarchingCubes.cpp(715): warning C4305: “=”: 从“double”到“cl_float”截断
+oclMarchingCubes.cpp(720): warning C4305: “=”: 从“double”到“cl_float”截断
+oclMarchingCubes.cpp(721): warning C4305: “=”: 从“double”到“cl_float”截断
+oclMarchingCubes.cpp(722): warning C4305: “=”: 从“double”到“cl_float”截断
+oclMarchingCubes.cpp(724): warning C4244: “=”: 从“double”转换到“cl_float”，可能丢失数据
+oclMarchingCubes.cpp(727): warning C4244: “=”: 从“double”转换到“float”，可能丢失数据
+oclMarchingCubes.cpp(729): warning C4244: “=”: 从“double”转换到“float”，可能丢失数据
+oclMarchingCubes.cpp(763): warning C4018: “<”: 有符号/无符号不匹配
+oclMarchingCubes.cpp(766): warning C4018: “<”: 有符号/无符号不匹配
+oclMarchingCubes.cpp(1168): warning C4305: “参数”: 从“double”到“GLfloat”截断
+oclMarchingCubes.cpp(1336): warning C4244: “+=”: 从“double”转换到“float”，可能丢失数据
+oclMarchingCubes.cpp(1338): warning C4305: “=”: 从“double”到“float”截断
+oclMarchingCubes.cpp(1343): warning C4244: “=”: 从“double”转换到“cl_float”，可能丢失数据
+  oclMarchingCubes_vs2010.vcxproj -> G:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\src\oclMarchingCubes\..\..\bin\Win64\Release\oclMarchingCubes.exe

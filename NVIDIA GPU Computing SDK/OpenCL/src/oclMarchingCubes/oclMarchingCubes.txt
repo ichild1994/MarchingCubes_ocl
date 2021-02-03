@@ -1,10 +1,10 @@
-J:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\src\oclMarchingCubes\..\..\bin\Win64\Debug\oclMarchingCubes.exe Starting...
+G:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\src\oclMarchingCubes\..\..\bin\Win64\Debug\oclMarchingCubes.exe Starting...
 
 Using CL-GL Interop...
 
-  CL_DEVICE_NAME: 			GeForce GTX 960M
+  CL_DEVICE_NAME: 			Quadro P1000
   CL_DEVICE_VENDOR: 			NVIDIA Corporation
-  CL_DRIVER_VERSION: 			441.22
+  CL_DRIVER_VERSION: 			452.57
   CL_DEVICE_VERSION: 			OpenCL 1.2 CUDA
   CL_DEVICE_OPENCL_C_VERSION: 		OpenCL C 1.2 
   CL_DEVICE_TYPE:			CL_DEVICE_TYPE_GPU
@@ -12,7 +12,7 @@ Using CL-GL Interop...
   CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:	3
   CL_DEVICE_MAX_WORK_ITEM_SIZES:	1024 / 1024 / 64 
   CL_DEVICE_MAX_WORK_GROUP_SIZE:	1024
-  CL_DEVICE_MAX_CLOCK_FREQUENCY:	1176 MHz
+  CL_DEVICE_MAX_CLOCK_FREQUENCY:	1480 MHz
   CL_DEVICE_ADDRESS_BITS:		64
   CL_DEVICE_MAX_MEM_ALLOC_SIZE:		1024 MByte
   CL_DEVICE_GLOBAL_MEM_SIZE:		4096 MByte
@@ -28,10 +28,10 @@ Using CL-GL Interop...
   CL_DEVICE_SINGLE_FP_CONFIG:		denorms INF-quietNaNs round-to-nearest round-to-zero round-to-inf fma 
 
   CL_DEVICE_IMAGE <dim>			2D_MAX_WIDTH	 16384
-					2D_MAX_HEIGHT	 16384
-					3D_MAX_WIDTH	 4096
-					3D_MAX_HEIGHT	 4096
-					3D_MAX_DEPTH	 4096
+					2D_MAX_HEIGHT	 32768
+					3D_MAX_WIDTH	 16384
+					3D_MAX_HEIGHT	 16384
+					3D_MAX_DEPTH	 16384
 
   CL_DEVICE_EXTENSIONS:			cl_khr_global_int32_base_atomics
 					cl_khr_global_int32_extended_atomics
@@ -44,16 +44,17 @@ Using CL-GL Interop...
 					cl_nv_compiler_options
 					cl_nv_device_attribute_query
 					cl_nv_pragma_unroll
-					cl_nv_d3d9_sharing
 					cl_nv_d3d10_sharing
 					cl_khr_d3d10_sharing
 					cl_nv_d3d11_sharing
 					cl_nv_copy_opts
+					cl_khr_gl_event
 					cl_nv_create_buffer
 					cl_khr_int64_base_atomics
+					cl_khr_int64_extended_atomics
 
 
-  CL_DEVICE_COMPUTE_CAPABILITY_NV:	5.0
+  CL_DEVICE_COMPUTE_CAPABILITY_NV:	6.1
   NUMBER OF MULTIPROCESSORS:		5
   NUMBER OF CUDA CORES:			4294967291
   CL_DEVICE_REGISTERS_PER_BLOCK_NV:	65536
@@ -64,7 +65,7 @@ Using CL-GL Interop...
   CL_DEVICE_PREFERRED_VECTOR_WIDTH_<t>	CHAR 1, SHORT 1, INT 1, LONG 1, FLOAT 1, DOUBLE 1
 
 
-grid: 512 x 512 x 129 = 33816576 voxels
-max verts = 33816576
+grid: 512 x 512 x 107 = 28049408 voxels
+max verts = 28049408
  Raw file data loaded...
 

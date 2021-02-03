@@ -1,0 +1,8 @@
+ObjectType = Image
+NDims = 3
+BinaryData = True
+BinaryDataByteOrderMSB = True
+DimSize = 512 512 105
+ElementSize = 824.21875 824.21875 2000.0000000000002
+ElementType = MET_UCHAR
+ElementDataFile = newpred-158.raw

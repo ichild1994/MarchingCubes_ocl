@@ -121,6 +121,15 @@
 
 #define REFRESH_DELAY	  10 //ms
 
+// RAW DATA TYPE
+enum RawDataType{
+	UCHAR8,	
+	USHORT16,
+	SHORT16,
+	FLOAT32,
+};
+RawDataType rawType = UCHAR8;
+
 #include "oclScan_common.h"
 
 // OpenCL vars
@@ -707,9 +716,12 @@ initMC(int argc, char** argv)
     numVoxels = gridSize[0]*gridSize[1]*gridSize[2];
 
 	// compute translate and scale info for MC
-	voxelSize[0] = 0.779297;
-	voxelSize[1] = 0.779297;
-	voxelSize[2] = 0.779297;// 4.94444466;
+	//voxelSize[0] = 0.779297;
+	//voxelSize[1] = 0.779297;
+	//voxelSize[2] = 4.9444446;
+	voxelSize[0] = 824.21875;
+	voxelSize[1] = 824.21875;
+	voxelSize[2] = 2000.0000000000002;
 	float sx = 2.0f / (gridSize[0] * voxelSize[0]);
 	float sy = 2.0f / (gridSize[1] * voxelSize[1]);
 	if (sx < sy) mc_scale = sx;
@@ -737,27 +749,42 @@ initMC(int argc, char** argv)
     }
 
     int size = gridSize[0]*gridSize[1]*gridSize[2];
-	//uchar *h_volumeU = loadRawFile(path, size);
-	//oclCheckErrorEX(h_volumeU != NULL, true, pCleanup);
-	//shrLog(" Raw file data loaded...\n\n");
-	//float *h_volumeF = (float*)malloc(size * sizeof(float));
-	//for (size_t i = 0; i < size; ++i) {
-	//	float val = (float)h_volumeU[i];
-	//	h_volumeF[i] = val / 255.0 - 0.5;
-	//}
+	int ori_size = gridSize[0] * gridSize[1] * (gridSize[2] - 2);
+	uchar *h_ori_volumeU = NULL;
+	float *h_ori_volumeF = NULL;
+	float* h_volumeF = NULL;
+	h_ori_volumeF = (float*)malloc(ori_size * sizeof(float));
+	h_volumeF = (float*)malloc(size * sizeof(float));
 
-	int ori_size = gridSize[0] * gridSize[1] * (gridSize[2]-2);
-	float* h_ori_volumeF = loadRawFilef(path, ori_size * sizeof(float));
-	oclCheckErrorEX(h_ori_volumeF != NULL, true, pCleanup);
-	shrLog(" Raw file data loaded...\n\n");
+	switch (rawType) {
+	case(UCHAR8): {
+		uchar *h_ori_volumeU = loadRawFile(path, ori_size);
+		oclCheckErrorEX(h_ori_volumeU != NULL, true, pCleanup);
+		shrLog(" Raw file data loaded...\n\n");
+		for (size_t i = 0; i < ori_size; ++i) {
+			float val = (float)h_ori_volumeU[i];
+			h_ori_volumeF[i] = val;// / 255.0 - 0.5;
+		}
+		free(h_ori_volumeU);
+		break;
+	}
+	case(FLOAT32): {
+		h_ori_volumeF = loadRawFilef(path, ori_size * sizeof(float));
+		oclCheckErrorEX(h_ori_volumeU != NULL, true, pCleanup);
+		shrLog(" Raw file data loaded...\n\n");
+	}
+	default: {
+		break;
+	}
+	}
 
+	// fill two bound slice for MarchingCuces
 	float fmin = h_ori_volumeF[0], fmax = h_ori_volumeF[0];
 	for (size_t i = 0; i < ori_size; ++i) {
 		if (h_ori_volumeF[i] > fmax) fmax = h_ori_volumeF[i];
 		if (h_ori_volumeF[i] < fmin) fmin = h_ori_volumeF[i];
 	}
 
-	float* h_volumeF = (float*)malloc(size * sizeof(float));
 	for (int i = 0; i < gridSize[0] * gridSize[1]; ++i) {
 		h_volumeF[i] = fmin;
 	}
@@ -767,8 +794,6 @@ initMC(int argc, char** argv)
 	memcpy(h_volumeF + gridSize[0] * gridSize[1], h_ori_volumeF, ori_size * sizeof(float));
 	//memcpy(h_volumeF, h_ori_volumeF + gridSize[0] * gridSize[1], gridSize[0] * gridSize[1] * sizeof(float));
 	//memcpy(h_volumeF + gridSize[0] * gridSize[1] * (gridSize[2]-1), h_ori_volumeF + gridSize[0] * gridSize[1] * (gridSize[2] - 3), gridSize[0] * gridSize[1] * sizeof(float));
-
-	uchar* h_volumeU = (uchar*)malloc(size * sizeof(uchar));
 
 	//float fmin = h_volumeF[0], fmax = h_volumeF[0];
 	//for (size_t i = 0; i < size; ++i) {
@@ -794,8 +819,7 @@ initMC(int argc, char** argv)
                                     gridSize[0]*4, gridSize[0] * gridSize[1]*4,
 								h_volumeF, &ciErrNum);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
-
-	free(h_volumeU);
+	free(h_ori_volumeF);
 	free(h_volumeF);
 
     // create VBOs
