@@ -6,7 +6,7 @@
     <LocalDebuggerCommandArguments>--gridx=512 --gridy=512 --gridz=105 --file=data\newpred-158.raw</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>--gridx=512 --gridy=512 --gridz=105 --file=data\OrganImageData.dat</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>--gridx=320 --gridy=320 --gridz=60 --sizex=0.6875 --sizey=0.6875 --sizez=1.686 --file=data\2\t2_tse_tra_320_p2_60.raw --file=data\2\t2_tse_tra_320_p2_60.raw --file=data\2\t2_tse_tra_320_p2_60.raw  --mask=data\2\t2_tse_tra_320_p2_60_mask.raw </LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

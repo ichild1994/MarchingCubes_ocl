@@ -1,3 +1,9 @@
-﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(1357,5): warning MSB8012: TargetPath(G:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\common\lib/x64\oclUtils.lib) does not match the Library's OutputFile property value (G:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\common\lib\x64\oclUtils64.lib). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Lib.OutputFile).
+﻿  oclUtils.cpp
+  Note: including windows.h
+  Note: including math.h
+  Note: including assert.h
+  Note: including shrUtils.h
+  Note: including opencl.h
+C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(1357,5): warning MSB8012: TargetPath(F:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\common\lib/x64\oclUtils.lib) does not match the Library's OutputFile property value (F:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\common\lib\x64\oclUtils64.lib). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Lib.OutputFile).
 C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(1359,5): warning MSB8012: TargetName(oclUtils) does not match the Library's OutputFile property value (oclUtils64). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Lib.OutputFile).
-  oclUtils_vs2008.vcxproj -> G:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\common\lib/x64\oclUtils.lib
+  oclUtils_vs2008.vcxproj -> F:\oclMarchingCubes\NVIDIA GPU Computing SDK\OpenCL\common\lib/x64\oclUtils.lib

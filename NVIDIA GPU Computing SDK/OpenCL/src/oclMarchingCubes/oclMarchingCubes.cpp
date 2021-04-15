@@ -69,6 +69,19 @@
 #include <GL/freeglut.h>
 #endif
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/vec3.hpp> // glm::vec3
+#include <glm/vec4.hpp> // glm::vec4
+#include <glm/mat4x4.hpp> // glm::mat4
+#include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
+#include <glm/ext/matrix_clip_space.hpp> // glm::perspective
+#include <glm/ext/scalar_constants.hpp> // glm::pi
+
+#include "camera.hpp"
+#include "GLSLShader.h"
+
 #ifdef _WIN32
 #  define WINDOWS_LEAN_AND_MEAN
 #  define NOMINMAX
@@ -118,6 +131,8 @@
 #else
    #define GL_SHARING_EXTENSION "cl_khr_gl_sharing"
 #endif
+
+#define GL_CHECK_ERRORS assert(glGetError()== GL_NO_ERROR);
 
 #define REFRESH_DELAY	  10 //ms
 
@@ -181,6 +196,15 @@ float mc_halfBound[3];
 float cameraDistance = 0.0;
 float ortho_scale = 1.0;
 
+camera cam;
+//glm::mat4 modelMat;
+//glm::mat4 mvpMat;
+
+Matrix4 modelMat;
+Matrix4 mvpMat;
+
+GLSLShader shader;
+
 cl_uint gridSizeLog2[4] = {5, 5, 5,0};
 cl_uint gridSizeShift[4];
 cl_uint gridSize[4];
@@ -201,12 +225,14 @@ float isoValue		= 0.0f;
 float dIsoValue		= 0.002f;
 
 // device data
-GLuint posVbo, normalVbo;
+GLuint posVbo, normalVbo, pos_normalVbo;
+GLuint posVao;
 
 GLint  gl_Shader;
 
 cl_mem d_pos = 0;
 cl_mem d_normal = 0;
+cl_mem d_pos_normal = 0;
 
 cl_mem d_volume = 0;
 cl_mem d_voxelVerts = 0;
@@ -221,7 +247,7 @@ cl_mem d_VertsHash = 0;
 std::vector<uint> h_VertsHash;
 std::vector<float> h_pos;
 std::vector<float> h_normal;
-
+std::vector<float> h_pos_normal;
 
 // tables
 cl_mem d_numVertsTable = 0;
@@ -265,6 +291,7 @@ void computeIsosurface();
 bool initGL(int argc, char **argv);
 void createVBO(GLuint* vbo, unsigned int size, cl_mem &vbo_cl);
 void deleteVBO(GLuint* vbo, cl_mem vbo_cl );
+//void createVAO(GLuint* vao, unsigned int size, cl_mem &vao_cl);
 
 void display();
 void keyboard(unsigned char key, int x, int y);
@@ -364,7 +391,7 @@ launch_compactVoxels(dim3 grid, dim3 threads, cl_mem compVoxelArray, cl_mem voxe
 
 void
 launch_generateTriangles2(dim3 grid, dim3 threads,
-                          cl_mem pos, cl_mem norm, cl_mem compactedVoxelArray, cl_mem numVertsScanned, cl_mem volume,
+                          cl_mem pos, cl_mem norm, cl_mem pos_norm, cl_mem compactedVoxelArray, cl_mem numVertsScanned, cl_mem volume,
                           cl_uint gridSize[4], cl_uint gridSizeShift[4], cl_uint gridSizeMask[4],
                           cl_float voxelSize[4], cl_float UpperLeft[4], float isoValue, uint activeVoxels, uint maxVerts)
 {
@@ -373,6 +400,8 @@ launch_generateTriangles2(dim3 grid, dim3 threads,
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
     ciErrNum = clSetKernelArg(generateTriangles2Kernel, k++, sizeof(cl_mem), &norm);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+	ciErrNum = clSetKernelArg(generateTriangles2Kernel, k++, sizeof(cl_mem), &pos_norm);
+	oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
     ciErrNum = clSetKernelArg(generateTriangles2Kernel, k++, sizeof(cl_mem), &compactedVoxelArray);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
     ciErrNum = clSetKernelArg(generateTriangles2Kernel, k++, sizeof(cl_mem), &numVertsScanned);
@@ -686,23 +715,40 @@ initMC(int argc, char** argv)
         gridSizeLog2[0] = gridSizeLog2[1] = gridSizeLog2[2] = n;
     }
     if (shrGetCmdLineArgumenti( argc, (const char**) argv, "gridx", &n)) {
-        gridSizeLog2[0] = n;
+		gridSize[0] = n;
+		//gridSizeLog2[0] = n;
     }
     if (shrGetCmdLineArgumenti( argc, (const char**) argv, "gridy", &n)) {
-        gridSizeLog2[1] = n;
+		gridSize[1] = n;
+		//gridSizeLog2[1] = n;
     }
     if (shrGetCmdLineArgumenti( argc, (const char**) argv, "gridz", &n)) {
-        gridSizeLog2[2] = n;
+		gridSize[2] = n;
+		//gridSizeLog2[2] = n;
     }
+	if (shrGetCmdLineArgumentf(argc, (const char**)argv, "sizex", &voxelSize[0])) {
+		//gridSizeLog2[0] = n;
+	}
+	if (shrGetCmdLineArgumentf(argc, (const char**)argv, "sizey", &voxelSize[1])) {
+		//gridSizeLog2[1] = n;
+	}
+	if (shrGetCmdLineArgumentf(argc, (const char**)argv, "sizez", &voxelSize[2])) {
+		//gridSizeLog2[2] = n;
+	}
 
     char *filename;
     if (shrGetCmdLineArgumentstr( argc, (const char**) argv, "file", &filename)) {
         volumeFilename = filename;
     }
+	char *maskfilename = NULL;
+	if (shrGetCmdLineArgumentstr(argc, (const char**)argv, "mask", &maskfilename)) {
+	}
 
-    gridSize[0] = gridSizeLog2[0];
-    gridSize[1] = gridSizeLog2[1];
-    gridSize[2] = gridSizeLog2[2]+2;
+
+    //gridSize[0] = gridSizeLog2[0];
+    //gridSize[1] = gridSizeLog2[1];
+    //gridSize[2] = gridSizeLog2[2]+2;
+	gridSize[2] += 2;
 
 
     gridSizeMask[0] = gridSize[0];
@@ -719,9 +765,9 @@ initMC(int argc, char** argv)
 	//voxelSize[0] = 0.779297;
 	//voxelSize[1] = 0.779297;
 	//voxelSize[2] = 4.9444446;
-	voxelSize[0] = 824.21875;
-	voxelSize[1] = 824.21875;
-	voxelSize[2] = 2000.0000000000002;
+	//voxelSize[0] = 824.21875;
+	//voxelSize[1] = 824.21875;
+	//voxelSize[2] = 2000.0000000000002;
 	float sx = 2.0f / (gridSize[0] * voxelSize[0]);
 	float sy = 2.0f / (gridSize[1] * voxelSize[1]);
 	if (sx < sy) mc_scale = sx;
@@ -736,8 +782,16 @@ initMC(int argc, char** argv)
 	mc_halfBound[2] = voxelSize[2] * (float)(gridSize[2] - 1)*0.5 * mc_scale;
 
 	cameraDistance = 2.0 * mc_halfBound[0];
+	cam.setZplane(mc_halfBound[0] * 0.5, cameraDistance + 2.0*mc_halfBound[0]);
 
-    maxVerts = gridSize[0]*gridSize[1]*gridSize[2];
+	// set Model Matrix for mc:
+	//modelMat = glm::scale(glm::mat4(1.0f), glm::vec3(mc_scale, mc_scale, mc_scale));
+	//modelMat = glm::translate(modelMat, glm::vec3(mc_centerOffset[0], mc_centerOffset[1], mc_centerOffset[2]));
+	modelMat.identity();
+	modelMat.scale(mc_scale);
+	modelMat.translate(mc_centerOffset[0], mc_centerOffset[1], mc_centerOffset[2]);
+
+    maxVerts = gridSize[0]*gridSize[1]*36;
     shrLog("grid: %d x %d x %d = %d voxels\n", gridSize[0], gridSize[1], gridSize[2], numVoxels);
     shrLog("max verts = %d\n", maxVerts);
 
@@ -747,10 +801,16 @@ initMC(int argc, char** argv)
         shrLog("Error finding file '%s'\n", volumeFilename);
         exit(EXIT_FAILURE);
     }
+	char* maskpath = shrFindFilePath(maskfilename, argv[0]);
+	if (maskpath == 0) {
+		shrLog("Error finding file '%s'\n", volumeFilename);
+		exit(EXIT_FAILURE);
+	}
 
     int size = gridSize[0]*gridSize[1]*gridSize[2];
 	int ori_size = gridSize[0] * gridSize[1] * (gridSize[2] - 2);
 	uchar *h_ori_volumeU = NULL;
+	uchar *h_ori_maskU = NULL;
 	float *h_ori_volumeF = NULL;
 	float* h_volumeF = NULL;
 	h_ori_volumeF = (float*)malloc(ori_size * sizeof(float));
@@ -758,14 +818,17 @@ initMC(int argc, char** argv)
 
 	switch (rawType) {
 	case(UCHAR8): {
-		uchar *h_ori_volumeU = loadRawFile(path, ori_size);
+		h_ori_volumeU = loadRawFile(path, ori_size);
+		h_ori_maskU = loadRawFile(maskpath, ori_size);
 		oclCheckErrorEX(h_ori_volumeU != NULL, true, pCleanup);
 		shrLog(" Raw file data loaded...\n\n");
 		for (size_t i = 0; i < ori_size; ++i) {
-			float val = (float)h_ori_volumeU[i];
+			float val = (float)h_ori_volumeU[i] * (float)(h_ori_maskU[i] / 255) / 255.0;
+			//float val = (float)(h_ori_volumeU[i]) / 255.0;
 			h_ori_volumeF[i] = val;// / 255.0 - 0.5;
 		}
 		free(h_ori_volumeU);
+		free(h_ori_maskU);
 		break;
 	}
 	case(FLOAT32): {
@@ -826,7 +889,26 @@ initMC(int argc, char** argv)
     if( !bQATest) {
         createVBO(&posVbo, maxVerts*sizeof(float)*4, d_pos);
         createVBO(&normalVbo, maxVerts*sizeof(float)*4, d_normal);
+		
+		createVBO(&pos_normalVbo, maxVerts * sizeof(float) * 4 * 2, d_pos_normal);
     }
+
+	glutReportErrors();
+	// shader:
+	glGenVertexArrays(1, &posVao);
+	glBindVertexArray(posVao);
+	//glBindBuffer(GL_ARRAY_BUFFER, posVbo);
+	//glEnableVertexAttribArray(shader["vVertex"]);
+	//glVertexAttribPointer(shader["vVertex"], 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+	glBindBuffer(GL_ARRAY_BUFFER, pos_normalVbo);
+	glEnableVertexAttribArray(shader["aPos"]);
+	glVertexAttribPointer(shader["aPos"], 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(0));
+	glEnableVertexAttribArray(shader["aNormal"]);
+	glVertexAttribPointer(shader["aNormal"], 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4*sizeof(float)));
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	glutReportErrors();
+
     
     // allocate textures
 	allocateTextures(&d_triTable, &d_numVertsTable );
@@ -849,8 +931,13 @@ initMC(int argc, char** argv)
 
 void Cleanup(int iExitCode)
 {
+	//Destroy shader
+	shader.DeleteShaderProgram();
+
     deleteVBO(&posVbo, d_pos);
     deleteVBO(&normalVbo, d_normal);
+	deleteVBO(&pos_normalVbo, d_pos_normal);
+	glDeleteVertexArrays(1, &posVao);
 
     if( d_triTable ) clReleaseMemObject(d_triTable);
     if( d_numVertsTable ) clReleaseMemObject(d_numVertsTable);
@@ -917,6 +1004,7 @@ runTest(int argc, char** argv)
     
     initCL(argc, argv);
 
+	glutReportErrors();
     if( !bQATest ) {
         // register callbacks
         glutDisplayFunc(display);
@@ -928,9 +1016,12 @@ runTest(int argc, char** argv)
         glutReshapeFunc(reshape);
         initMenus();
     }
+	glutReportErrors();
 
     // Initialize OpenCL buffers for Marching Cubes 
     initMC(argc, argv);
+
+	glutReportErrors();
 
     // start rendering mainloop
     if( !bQATest ) {
@@ -1004,13 +1095,13 @@ computeIsosurface()
     //printf("totalVerts = %d\n", totalVerts);
 
 
-    cl_mem interopBuffers[] = {d_pos, d_normal};
+    cl_mem interopBuffers[] = {d_pos, d_normal, d_pos_normal};
     
     // generate triangles, writing to vertex buffers
 	if( g_glInterop ) {
 		// Acquire PBO for OpenCL writing
 		glFlush();
-		ciErrNum = clEnqueueAcquireGLObjects(cqCommandQueue, 2, interopBuffers, 0, 0, 0);
+		ciErrNum = clEnqueueAcquireGLObjects(cqCommandQueue, 3, interopBuffers, 0, 0, 0);
         oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
     }
     
@@ -1020,7 +1111,7 @@ computeIsosurface()
     //    grid2.x/=2;
     //    grid2.y*=2;
     //}
-    launch_generateTriangles2(grid2, NTHREADS, d_pos, d_normal, 
+    launch_generateTriangles2(grid2, NTHREADS, d_pos, d_normal, d_pos_normal,
                                             d_compVoxelArray, 
                                             d_voxelVertsScan, d_volume, 
                                             gridSize, gridSizeShift, gridSizeMask, 
@@ -1030,9 +1121,11 @@ computeIsosurface()
 
 	h_pos.resize(totalVerts * 4);
 	h_normal.resize(totalVerts * 4);
+	h_pos_normal.resize(totalVerts * 4 * 2);
 	h_VertsHash.resize(totalVerts);
 	dumpBuffer(d_pos, h_pos.data(), totalVerts * 4);
 	dumpBuffer(d_normal, h_normal.data(), totalVerts * 4);
+	dumpBuffer(d_pos_normal, h_pos_normal.data(), totalVerts * 4 * 2);
 	dumpBuffer(d_VertsHash, h_VertsHash.data(), totalVerts);
 	std::string filename;
 	filename = std::string(volumeFilename) + "_" + std::to_string(isoValue) + ".obj";
@@ -1042,9 +1135,10 @@ computeIsosurface()
 	}
 
 
+
 	if( g_glInterop ) {
 		// Transfer ownership of buffer back from CL to GL  
-		ciErrNum = clEnqueueReleaseGLObjects(cqCommandQueue, 2, interopBuffers, 0, 0, 0);
+		ciErrNum = clEnqueueReleaseGLObjects(cqCommandQueue, 3, interopBuffers, 0, 0, 0);
 		oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 
 		clFinish( cqCommandQueue );
@@ -1054,29 +1148,29 @@ computeIsosurface()
 
 }
 
-// shader for displaying floating-point texture
-static const char *shader_code = 
-"!!ARBfp1.0\n"
-"TEX result.color, fragment.texcoord, texture[0], 2D; \n"
-"END";
-
-GLuint compileASMShader(GLenum program_type, const char *code)
-{
-    GLuint program_id;
-    glGenProgramsARB(1, &program_id);
-    glBindProgramARB(program_type, program_id);
-    glProgramStringARB(program_type, GL_PROGRAM_FORMAT_ASCII_ARB, (GLsizei) strlen(code), (GLubyte *) code);
-
-    GLint error_pos;
-    glGetIntegerv(GL_PROGRAM_ERROR_POSITION_ARB, &error_pos);
-    if ((int)error_pos != -1) {
-        const GLubyte *error_string;
-        error_string = glGetString(GL_PROGRAM_ERROR_STRING_ARB);
-        shrLog("Program error at position: %d\n%s\n", (int)error_pos, error_string);
-        return 0;
-    }
-    return program_id;
-}
+//// shader for displaying floating-point texture
+//static const char *shader_code = 
+//"!!ARBfp1.0\n"
+//"TEX result.color, fragment.texcoord, texture[0], 2D; \n"
+//"END";
+//
+//GLuint compileASMShader(GLenum program_type, const char *code)
+//{
+//    GLuint program_id;
+//    glGenProgramsARB(1, &program_id);
+//    glBindProgramARB(program_type, program_id);
+//    glProgramStringARB(program_type, GL_PROGRAM_FORMAT_ASCII_ARB, (GLsizei) strlen(code), (GLubyte *) code);
+//
+//    GLint error_pos;
+//    glGetIntegerv(GL_PROGRAM_ERROR_POSITION_ARB, &error_pos);
+//    if ((int)error_pos != -1) {
+//        const GLubyte *error_string;
+//        error_string = glGetString(GL_PROGRAM_ERROR_STRING_ARB);
+//        shrLog("Program error at position: %d\n%s\n", (int)error_pos, error_string);
+//        return 0;
+//    }
+//    return program_id;
+//}
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Initialize OpenGL
@@ -1087,49 +1181,85 @@ initGL(int argc, char **argv)
     // Create GL context
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
-    glutInitWindowSize(window_width, window_height);
+	glutInitContextVersion(3, 3);
+	glutInitContextFlags(GLUT_COMPATIBILITY_PROFILE | GLUT_DEBUG);
+	glutInitContextProfile(GLUT_FORWARD_COMPATIBLE);
+	glutInitWindowSize(window_width, window_height);
     glutCreateWindow("CUDA Marching Cubes");
 #if !(defined (__APPLE__) || defined(MACOSX))
     glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
 #endif
-
+	
     // initialize necessary OpenGL extensions
-    glewInit();
-    if (! glewIsSupported("GL_VERSION_2_0 " 
-		                  )) {
-        fprintf(stderr, "ERROR: Support for necessary OpenGL extensions missing.");
-        fflush(stderr);
-        return false;
-    }
+	GLenum err = glewInit();
+	if (GLEW_OK != err) {
+		cerr << "Error: " << glewGetErrorString(err) << endl;
+	}
+	else {
+		if (GLEW_VERSION_3_3)
+		{
+			cout << "Driver supports OpenGL 3.3\nDetails:" << endl;
+		}
+	}
+    //if (! glewIsSupported("GL_VERSION_2_0 " 
+		  //                )) {
+    //    fprintf(stderr, "ERROR: Support for necessary OpenGL extensions missing.");
+    //    fflush(stderr);
+    //    return false;
+    //}
 
     // default initialization
-    glClearColor(0.1f, 0.2f, 0.3f, 1.0f);
-    glEnable(GL_DEPTH_TEST);
+	//glClearColor(0.1f, 0.2f, 0.3f, 1.0f);
+	glEnable(GL_DEPTH_TEST);
 
-    // good old-fashioned fixed function lighting
-    float black[]    = { 0.0f, 0.0f, 0.0f, 1.0f };
-    float white[]    = { 1.0f, 1.0f, 1.0f, 1.0f };
-    float ambient[]  = { 0.1f, 0.1f, 0.1f, 1.0f };
-    float diffuse[]  = { 0.9f, 0.9f, 0.9f, 1.0f };
-    float lightPos[] = { 0.0f, 0.0f, 1.0f, 0.0f };
+	// good old - fashioned fixed function lighting
+	float black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	float white[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	float ambient[] = { 0.1f, 0.1f, 0.1f, 1.0f };
+	float diffuse[] = { 0.9f, 0.9f, 0.9f, 1.0f };
+	float lightPos[] = { 0.0f, 0.0f, 1.0f, 0.0f };
 
-    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, black);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, black);
 
-    glLightfv(GL_LIGHT0, GL_AMBIENT, white);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, white);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, white);
-    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, white);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, white);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, white);
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
-    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, black);
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, black);
 
-    glEnable(GL_LIGHT0);
-    glEnable(GL_NORMALIZE);
+	glEnable(GL_LIGHT0);
+	glEnable(GL_NORMALIZE);
     
     // load shader program
-    gl_Shader = compileASMShader(GL_FRAGMENT_PROGRAM_ARB, shader_code);
+    //gl_Shader = compileASMShader(GL_FRAGMENT_PROGRAM_ARB, shader_code);
 
+	GL_CHECK_ERRORS
+	//load shader
+	shader.LoadFromFile(GL_VERTEX_SHADER, "shader.vert");
+	shader.LoadFromFile(GL_FRAGMENT_SHADER, "shader.frag");
+	//compile and link shader
+	shader.CreateAndLinkProgram();
+	shader.Use();
+	//add shader attribute and uniforms
+	//shader.AddAttribute("vVertex");
+	//shader.AddUniform("MVP");
+	shader.AddAttribute("aPos");
+	shader.AddAttribute("aNormal");
+	shader.AddUniform("model");
+	shader.AddUniform("view");
+	shader.AddUniform("projection");
+	shader.AddUniform("lightPos");
+	shader.AddUniform("viewPos");
+	shader.AddUniform("lightColor");
+	shader.AddUniform("objectColor");
+
+	shader.UnUse();
+
+
+	GL_CHECK_ERRORS
 
 	glutReportErrors();
 
@@ -1198,6 +1328,47 @@ void renderIsosurface()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Render isosurface geometry from the vertex buffers using shaders!
+////////////////////////////////////////////////////////////////////////////////
+void renderIsosurface_shader()
+{
+	glPolygonMode(GL_FRONT_AND_BACK, wireframe? GL_LINE:GL_FILL);
+
+	//clear the colour and depth buffer
+	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//bind the shader
+	shader.Use();
+	//mvpMat = cam.getProjMatrixData() * cam.getViewMatrixData() * modelMat;
+	mvpMat = cam.getProjMat4() * cam.getViewMat4() * modelMat;
+	//pass the shader uniform
+	//glUniformMatrix4fv(shader("MVP"), 1, GL_FALSE, glm::value_ptr(mvpMat));
+	glUniformMatrix4fv(shader("projection"), 1, GL_FALSE, cam.getProjMatrixDataPtr());
+	glUniformMatrix4fv(shader("view"), 1, GL_FALSE, cam.getViewMatrixDataPtr());
+	glUniformMatrix4fv(shader("model"), 1, GL_FALSE, modelMat.get());
+	glm::vec3 lightPos(0.0, 0.0, 2.0);
+	glUniform3fv(shader("lightPos"), 1, glm::value_ptr(lightPos));
+	glm::vec3 viewPos(0.0, 0.0, 0.0);
+	glUniform3fv(shader("viewPos"), 1, glm::value_ptr(viewPos));
+	glm::vec3 lightColor(1.0, 1.0, 1.0);
+	glUniform3fv(shader("lightColor"), 1, glm::value_ptr(lightColor));
+	glm::vec3 objectColor(1.0, 0.0, 0.0);
+	glUniform3fv(shader("objectColor"), 1, glm::value_ptr(objectColor));
+	//draw triangle
+	glBindVertexArray(posVao); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+	glDrawArrays(GL_TRIANGLES, 0, totalVerts);
+	//unbind the shader
+	shader.UnUse();
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	//swap front and back buffers to show the rendered result
+	//glutSwapBuffers();
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //! Display callback
 ////////////////////////////////////////////////////////////////////////////////
 void
@@ -1205,15 +1376,16 @@ display()
 {
     shrDeltaT(0);
 
+	glutReportErrors();
     // run CUDA kernel to generate geometry
     if (compute) {
         computeIsosurface();
     }
-
-
+	glutReportErrors();
+	glEnable(GL_NORMALIZE);
     // Common display code path
 	{
-		glColor3f(.0, .0, .0);
+		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// set view matrix
@@ -1223,7 +1395,7 @@ display()
 		glTranslatef(mc_translate[0], mc_translate[1], mc_translate[2]);
 		glRotatef(mc_rotate[0], 1.0, 0.0, 0.0);
 		glRotatef(mc_rotate[1], 0.0, 1.0, 0.0);
-		glRotatef(180.0, 0, 1.0, 0); // heading
+		glRotatef(180.0, 0.0, 1.0, 0.0); // heading
 
 		glPolygonMode(GL_FRONT, wireframe? GL_LINE : GL_FILL);
 		if (lighting) {
@@ -1233,6 +1405,8 @@ display()
 		// render
 		if (render) {
 			glPushMatrix();
+			//glLoadIdentity();
+			//glMultMatrixf(cam.getViewMatrixDataPtr());
 			//glRotatef(180.0, 0.0, 1.0, 0.0);
 			//glRotatef(-90.0, 1.0, 0.0, 0.0);
 			if (mc_mode == ORTHO) {
@@ -1240,11 +1414,28 @@ display()
 			}
 			glScalef(mc_scale, mc_scale, mc_scale);
 			glTranslatef(mc_centerOffset[0], mc_centerOffset[1], mc_centerOffset[2]);
+
+			////float mat[16];
+			////glGetFloatv(GL_MODELVIEW_MATRIX, mat);
+			////for (int i = 0; i < 16; ++i) printf("%f ", mat[i]);
+			////for (int i = 0; i < 16; ++i) printf("%f ", glm::value_ptr(modelMat)[i]);
+
 			renderIsosurface();
+			////renderIsosurface_shader();
+
 			glPopMatrix();
+
+			glLoadIdentity();
+			//glMultMatrixf(cam.getProjMatrixDataPtr());
+			glMultMatrixf(cam.getViewMatrixDataPtr());
+			glMultMatrixf(modelMat.get());
+			renderIsosurface();
+
+			renderIsosurface_shader();
+			
 		}
 
-		glDisable(GL_LIGHTING);
+		//glDisable(GL_LIGHTING);
 	} 
 
     totalTime += shrDeltaT(0);
@@ -1300,6 +1491,9 @@ keyboard(unsigned char key, int /*x*/, int /*y*/)
 		mc_mode = 1 - mc_mode;
 		ortho_scale = 1.0;
 		for (int i = 0; i < 4; ++i) mc_translate[i] = 0.0;
+		mc_rotate[0] = 30.0;  mc_rotate[1] = -45.0; mc_rotate[2] = 0.0; mc_rotate[3] = 0.0;
+		mc_translate[0] = mc_translate[1] = mc_translate[2] = mc_translate[3] = 0.0;
+		cam.changeProjMode();
 		glutReshapeWindow(window_width, window_height);
 		break;
 	case 's':
@@ -1348,14 +1542,22 @@ void motion(int x, int y)
 		if (mc_rotate[0] > 360.0) mc_rotate[0] -= 360.0;
 		if (mc_rotate[1] < 0.0)   mc_rotate[1] += 360.0;
 		if (mc_rotate[1] > 360.0) mc_rotate[1] -= 360.0;
-    } else if (mouse_buttons==2) {
+
+		//cam.setRotate(mc_rotate[0], mc_rotate[1], 0.0);
+		cam.addRotate(dy, dx, 0.0f);
+    } 
+	else if (mouse_buttons==2) {
         mc_translate[0] += dx * 0.005f;
         mc_translate[1] -= dy * 0.005f;
 		if (mc_translate[0] > 1.5)   mc_translate[0] = 1.5;
 		if (mc_translate[0] < -1.5)  mc_translate[0] = -1.5;
 		if (mc_translate[1] > 1.5)   mc_translate[1] = 1.5;
 		if (mc_translate[1] < -1.5)  mc_translate[1] = -1.5;
-    } else if (mouse_buttons==3) {
+
+		//cam.setCamPos(-dx, dy, 0.0);
+		cam.addCamPos(-dx, dy, 0.0);
+    } 
+	else if (mouse_buttons==3) {
 		if (mc_mode == ORTHO) {
 			ortho_scale += dy * 0.01;
 			if (ortho_scale > 8.0) ortho_scale = 8.0;
@@ -1366,6 +1568,7 @@ void motion(int x, int y)
 			if (mc_translate[2] > cameraDistance)   mc_translate[2] = cameraDistance;
 			if (mc_translate[2] < -3.0*mc_halfBound[0])  mc_translate[2] = -3.0*mc_halfBound[0];
 		}
+		cam.addScale(dy);
     }
 
     mouse_old_x = x;
@@ -1397,15 +1600,20 @@ void reshape(int w, int h)
 		if (w > h)
 			gluPerspective(60.0f, float(w) / float(h), -(-mc_halfBound[0]*0.5), -(-cameraDistance - 2.0*mc_halfBound[0]));
 		else
-			gluPerspective(2.0*atan(float(h) / float(w)*0.57735)*180.0 / mc_PI, float(w) / float(h), -(-mc_halfBound[0]*0.5), -(-cameraDistance - 2.0*mc_halfBound[0]));
+			gluPerspective(2.0*atan(float(h)/float(w)*tan(0.5f*60.0f*mc_PI/180.0f))*180.0 / mc_PI, float(w) / float(h), -(-mc_halfBound[0]*0.5), -(-cameraDistance - 2.0*mc_halfBound[0]));
 	}
-	glMatrixMode(GL_MODELVIEW);
+	//glGetFloatv(GL_PROJECTION_MATRIX, cam.getProjMatrixDataPtr());
+
+	//cam.setZplane(mc_halfBound[0] * 0.5, cameraDistance + 2.0*mc_halfBound[0]);
+	cam.setWindowSize(w, h);
+	glLoadMatrixf(cam.getProjMatrixDataPtr());
+
 
     //glMatrixMode(GL_PROJECTION);
     //glLoadIdentity();
     //gluPerspective(60.0, (float) w / (float) h, 0.1, 10.0);
 
-    //glMatrixMode(GL_MODELVIEW);
+    glMatrixMode(GL_MODELVIEW);
     //glViewport(0, 0, w, h);
 }
 

@@ -1,0 +1,8 @@
+ObjectType = Image
+NDims = 3
+BinaryData = True
+BinaryDataByteOrderMSB = True
+DimSize = 640 640 23
+ElementSize = 0.3125 0.3125 0.09414732185272809
+ElementType = MET_UCHAR
+ElementDataFile = p2.raw

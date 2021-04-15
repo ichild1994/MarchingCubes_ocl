@@ -125,13 +125,13 @@ float4 calcNormal(float4 v0, float4 v1, float4 v2)
     float4 edge0 = v1 - v0;
     float4 edge1 = v2 - v0;
     // note - it's faster to perform normalization in vertex shader rather than here
-    return cross(edge0, edge1);
+    return normalize(cross(edge0, edge1));
 }
 
 // version that calculates flat surface normal for each triangle
 __kernel
 void
-generateTriangles2(__global float4 *pos, __global float4 *norm, __global uint *compactedVoxelArray, __global uint *numVertsScanned, 
+generateTriangles2(__global float4 *pos, __global float4 *norm, __global float4 *pos_norm, __global uint *compactedVoxelArray, __global uint *numVertsScanned,
                    __read_only image3d_t volume,
                    uint4 gridSize, uint4 gridSizeShift, uint4 gridSizeMask,
                    float4 voxelSize, float4 upperLeftPos, float isoValue, uint activeVoxels, uint maxVerts, 
@@ -257,14 +257,20 @@ generateTriangles2(__global float4 *pos, __global float4 *norm, __global uint *c
             pos[index] = v[1];
             norm[index] = n;
 			vertexHash[index] = vHash[1];
+			pos_norm[2 * index] = v[1];
+			pos_norm[2 * index + 1] = n;
 
             pos[index+1] = v[0];
             norm[index+1] = n;
 			vertexHash[index+1] = vHash[0];
+			pos_norm[2 * (index + 1)] = v[0];
+			pos_norm[2 * (index + 1) + 1] = n;
 
             pos[index+2] = v[2];
             norm[index+2] = n;
 			vertexHash[index+2] = vHash[2];
+			pos_norm[2 * (index + 2)] = v[2];
+			pos_norm[2 * (index + 2) + 1] = n;
         }
     }
 }

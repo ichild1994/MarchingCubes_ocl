@@ -1,0 +1,8 @@
+ObjectType = Image
+NDims = 3
+BinaryData = True
+BinaryDataByteOrderMSB = True
+DimSize = 320 320 60
+ElementSize = 0.6875 0.6875 1.6998774429848278
+ElementType = MET_USHORT
+ElementDataFile = t2_tse_tra_320_p2_60.raw

@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="mc_helper.cpp" />
+    <ClCompile Include="oclMarchingCubes.cpp" />
+    <ClCompile Include="ScanApple.cpp" />
+    <ClCompile Include="GLSLShader.cpp" />
+    <ClCompile Include="Matrices.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="defines.h" />
+    <ClInclude Include="mc_helper.h" />
+    <ClInclude Include="ScanApple.h" />
+    <ClInclude Include="tables.h" />
+    <ClInclude Include="camera.hpp" />
+    <ClInclude Include="GLSLShader.h" />
+    <ClInclude Include="Matrices.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="marchingCubes_kernel.cl" />
+    <None Include="scan_kernel_MP.cl" />
+    <None Include="shader.frag" />
+    <None Include="shader.vert" />
+  </ItemGroup>
+</Project>

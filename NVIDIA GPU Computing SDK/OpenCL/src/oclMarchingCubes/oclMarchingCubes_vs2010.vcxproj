@@ -132,7 +132,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>oclUtils64D.lib;shrUtils64D.lib;glew64.lib;OpenCL.lib;</AdditionalDependencies>
+      <AdditionalDependencies>oclUtils64D.lib;shrUtils64D.lib;glew32.lib;OpenCL.lib;freeglut.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(CudaToolkitDir)/lib/$(Platform);../../common/lib/$(Platform);../../../shared/lib/$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
@@ -185,10 +185,10 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>oclUtils64.lib;shrUtils64.lib;glew64.lib;OpenCL.lib;</AdditionalDependencies>
+      <AdditionalDependencies>oclUtils64.lib;shrUtils64.lib;glew32.lib;OpenCL.lib;freeglut.lib</AdditionalDependencies>
       <OutputFile>$(OutDir)/oclMarchingCubes.exe</OutputFile>
       <AdditionalLibraryDirectories>$(CudaToolkitDir)/lib/$(Platform);../../common/lib/$(Platform);../../../shared/lib/$(Platform);D:\workingProject\3DRendering-master\RenderLib\3rdParty\OpenCL\OpenCL\common\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -206,14 +206,21 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </None>
     <None Include="scan_kernel_MP.cl" />
+    <None Include="shader.frag" />
+    <None Include="shader.vert" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="GLSLShader.cpp" />
+    <ClCompile Include="Matrices.cpp" />
     <ClCompile Include="mc_helper.cpp" />
     <ClCompile Include="oclMarchingCubes.cpp" />
     <ClCompile Include="ScanApple.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="camera.hpp" />
     <ClInclude Include="defines.h" />
+    <ClInclude Include="GLSLShader.h" />
+    <ClInclude Include="Matrices.h" />
     <ClInclude Include="mc_helper.h" />
     <ClInclude Include="ScanApple.h" />
     <ClInclude Include="tables.h" />

@@ -1,0 +1,8 @@
+ObjectType = Image
+NDims = 3
+BinaryData = True
+BinaryDataByteOrderMSB = True
+DimSize = 320 320 60
+ElementSize = 0.8125 0.8125 2.833129044236724
+ElementType = MET_UCHAR
+ElementDataFile = t1_tse_tra_p2_320_60.raw
