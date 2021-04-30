@@ -85,6 +85,7 @@ struct Vector3
 
     // operators
     Vector3     operator-() const;                      // unary operator (negate)
+	const float* get() { return (const float*)&x; }
     Vector3     operator+(const Vector3& rhs) const;    // add rhs
     Vector3     operator-(const Vector3& rhs) const;    // subtract rhs
     Vector3&    operator+=(const Vector3& rhs);         // add rhs and update this object
@@ -123,6 +124,7 @@ struct Vector4
 
     // utils functions
     void        set(float x, float y, float z, float w);
+	const float* get() { return (const float*)&x; }
     float       length() const;                         //
     float       distance(const Vector4& vec) const;     // distance between two vectors
     Vector4&    normalize();                            //

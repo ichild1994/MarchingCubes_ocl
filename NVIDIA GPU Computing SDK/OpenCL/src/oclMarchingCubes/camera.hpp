@@ -22,15 +22,15 @@ private:
 	float m_zfar;
 	
 	enum {
-		ORTHO = 0,
-		PERSPECTIVE = 1,
+		PERSPECTIVE = 0,
+		ORTHO = 1,
 	};
 	int m_projMode;
 
 	// euler Angles for rotations on Model!
-	float yaw; // Z
-	float pitch; // Y 
-	float roll; // X
+	float rx; // X
+	float ry; // Y 
+	float rz; // Z
 	float rotate_speed;
 	float displace_speed;
 
@@ -46,20 +46,56 @@ public:
 		updateMatrix();
 	}
 
-	void setRotate(float _roll, float _pitch, float _yaw) {
-		roll = _roll;
-		pitch = _pitch;
-		yaw = _yaw;
+	void setRotate(float x, float y, float z) {
+		rx = x;
+		ry = y;
+		rz = z;
 		updateMatrix();
 	}
 
-	void addRotate(float _roll, float _pitch, float _yaw) {
-		roll += rotate_speed*_roll;
-		pitch += rotate_speed*_pitch;
-		yaw += rotate_speed*_yaw;
+	void addRotateZ(float _z) {
+		rz += rotate_speed*_z;
+		if (rz > 360.0f) {
+			rz -= 360.0f;
+		}
+		else if (rz < 0.0f) {
+			rz += 360.0f;
+		}
+	}
+	void addRotateY(float _y) {
+		ry += rotate_speed*_y;
+		if (ry > 360.0f) {
+			ry -= 360.0f;
+		}
+		else if (ry < 0.0f) {
+			ry += 360.0f;
+		}
+	}
+	void addRotateX(float _x) {
+		rx += rotate_speed*_x;
+		if (rx > 360.0f) {
+			rx -= 360.0f;
+		}
+		else if (rx < 0.0f) {
+			rx += 360.0f;
+		}
+	}
+	void addRotate(float _x, float _y, float _z) {
+		//roll += rotate_speed*_roll;
+		//pitch += rotate_speed*_pitch;
+		//yaw += rotate_speed*_yaw;
+		addRotateX(_x);
+		addRotateY(_y);
+		addRotateZ(_z);
 		updateMatrix();
 	}
 	
+	void setCamPos(float x, float y, float z) {
+		m_camPos.x = x;
+		m_camPos.y = y;
+		m_camPos.z = z;
+	}
+
 	void addCamPos(float dx, float dy, float dz) {
 		m_camPos += displace_speed*Vector3(dx, dy, dz);
 		m_camPos.x = boundf(m_camPos.x, -2.0f, 2.0f);
@@ -68,9 +104,22 @@ public:
 		updateMatrix();
 	}
 
+	void setDistance(float dist) {
+		m_camDistance = dist;
+	}
+
 	void setZplane(float _znear, float _zfar) {
 		m_znear = _znear;
 		m_zfar = _zfar;
+	}
+
+	void setOrthoScale(float s) {
+		m_orthoScale = s;
+	}
+
+	void setProjMode(int flag) {
+		if(flag == ORTHO || flag == PERSPECTIVE)
+			m_projMode = flag;
 	}
 
 	inline float boundf(float x, float low, float high) {
@@ -99,11 +148,11 @@ public:
 		//viewMat = glm::rotate(viewMat, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 		m_viewMat.identity();
 		m_viewMat.translate(-m_camPos.x, -m_camPos.y, -m_camPos.z);
-		m_viewMat.rotateX(roll);
-		m_viewMat.rotateZ(yaw);
-		m_viewMat.rotateY(pitch);
-		m_viewMat.rotateY(180.0f);
 
+		m_viewMat.rotateZ(rz);
+		m_viewMat.rotateX(rx);
+		m_viewMat.rotateY(ry);
+		m_viewMat.rotateY(180.0f);
 		if (m_projMode == ORTHO) {
 			//viewMat = glm::scale(viewMat, glm::vec3(orthoScale));
 			m_viewMat.scale(m_orthoScale);
@@ -112,12 +161,12 @@ public:
 		if (m_projMode == ORTHO) {
 			if (m_winWidth > m_winHeight)
 				//projMat = glm::ortho(-2.0f*winWidth / winHeight, 2.0f*winWidth / winHeight, -2.0f, 2.0f, -(-camDistance + 1000.0f), -(-camDistance - 1000.0f));
-				//projMat.setOrtho(-2.0f*winWidth / winHeight, 2.0f*winWidth / winHeight, -2.0f, 2.0f, -(-camDistance + 1000.0f), -(-camDistance - 1000.0f));
-				m_projMat.setOrtho(-2.0f*m_winWidth / m_winHeight, 2.0f*m_winWidth / m_winHeight, -2.0f, 2.0f, m_znear, m_zfar);
+				m_projMat.setOrtho(-2.0f*m_winWidth / m_winHeight, 2.0f*m_winWidth / m_winHeight, -2.0f, 2.0f, -(-m_camPos[2] + 1000.0f), -(-m_camPos[2] - 1000.0f));
+				//m_projMat.setOrtho(-2.0f*m_winWidth / m_winHeight, 2.0f*m_winWidth / m_winHeight, -2.0f, 2.0f, m_znear, m_zfar);
 			else
 				//projMat = glm::ortho(-2.0f, 2.0f, -2.0f*winHeight / winWidth, 2.0f*winHeight / winWidth, -(-camDistance + 1000.0f), -(-camDistance - 1000.0f));
-				//projMat.setOrtho(-2.0f, 2.0f, -2.0f*winHeight / winWidth, 2.0f*winHeight / winWidth, -(-camDistance + 1000.0f), -(-camDistance - 1000.0f));
-				m_projMat.setOrtho(-2.0f*m_winWidth / m_winHeight, 2.0f*m_winWidth / m_winHeight, -2.0f, 2.0f, m_znear, m_zfar);
+				m_projMat.setOrtho(-2.0f, 2.0f, -2.0f*m_winHeight / m_winWidth, 2.0f*m_winHeight / m_winWidth, -(-m_camPos[2] + 1000.0f), -(-m_camPos[2] - 1000.0f));
+				//m_projMat.setOrtho(-2.0f*m_winWidth / m_winHeight, 2.0f*m_winWidth / m_winHeight, -2.0f, 2.0f, m_znear, m_zfar);
 		}
 		else if (m_projMode == PERSPECTIVE) {
 			if (m_winWidth > m_winHeight)
@@ -133,10 +182,10 @@ public:
 		m_fov = 60.0;
 		m_winWidth = m_winHeight = 512.0;
 		m_orthoScale = 1.0;
-		roll = 30.0;
-		pitch = -45.0;
-		yaw = 0.0;
-		rotate_speed = 0.2;
+		rz = 0.0f;
+		ry = -45.0;
+		rx = 45.0f;
+		rotate_speed = 1.0;
 		displace_speed = 0.005;
 		m_camDistance = 2.0;
 		m_camPos = Vector3(0.0f, 0.0f, m_camDistance);
@@ -149,14 +198,21 @@ public:
 		//reset();
 	}
 
-	float* getProjMatrixDataPtr() {
+	const float* getProjMatrixDataPtr() {
 		//return glm::value_ptr(projMat);
 		return m_projMat.get();
 	}
-
-	float* getViewMatrixDataPtr() {
+	const float* getProjMatrixDataTransPosePtr() {
+		//return glm::value_ptr(projMat);
+		return m_projMat.getTranspose();
+	}
+	const float* getViewMatrixDataPtr() {
 		//return glm::value_ptr(viewMat);
 		return m_viewMat.get();
+	}
+	const float* getViewMatrixDataTransPosePtr() {
+		//return glm::value_ptr(viewMat);
+		return m_viewMat.getTranspose();
 	}
 
 	//glm::mat4 getProjMatrixData() {
@@ -170,5 +226,18 @@ public:
 	}
 	Matrix4 getViewMat4() {
 		return m_viewMat;
+	}
+	float getFov() {
+		return m_fov;
+	}
+	void getWindowSize(float *width_, float *height_) {
+		*width_ = m_winWidth;
+		*height_ = m_winHeight;
+	}
+	float getZnear() {
+		return m_znear;
+	}
+	Vector3 getPos() {
+		return m_camPos;
 	}
 };

@@ -417,12 +417,14 @@ Matrix4& Matrix4::translate(const Vector3& v)
 
 Matrix4& Matrix4::translate(float x, float y, float z)
 {
-    //m[0] += m[12]*x;   m[1] += m[13]*x;   m[2] += m[14]*x;   m[3] += m[15]*x;
-    //m[4] += m[12]*y;   m[5] += m[13]*y;   m[6] += m[14]*y;   m[7] += m[15]*y;
-    //m[8] += m[12]*z;   m[9] += m[13]*z;   m[10]+= m[14]*z;   m[11]+= m[15]*z;
-	m[12] += m[0] * x + m[4] * y + m[8] * z;
-	m[13] += m[1] * x + m[5] * y + m[9] * z;
-	m[14] += m[2] * x + m[6] * y + m[10] * z;
+	//m[12] += m[0] * x + m[4] * y + m[8] * z;
+	//m[13] += m[1] * x + m[5] * y + m[9] * z;
+	//m[14] += m[2] * x + m[6] * y + m[10] * z;
+	//m[15] += m[3] * x + m[7] * y + m[11] * z;
+	m[3] += m[0] * x + m[1] * y + m[2] * z;
+	m[7] += m[4] * x + m[5] * y + m[6] * z;
+	m[11] += m[8] * x + m[9] * y + m[10] * z;
+	m[15] += m[12] * x + m[13] * y + m[14] * z;
     return *this;
 }
 
@@ -438,9 +440,12 @@ Matrix4& Matrix4::scale(float s)
 
 Matrix4& Matrix4::scale(float x, float y, float z)
 {
-    m[0] = m[0]*x;   m[1] = m[1]*x;   m[2] = m[2]*x;   m[3] = m[3]*x;
-    m[4] = m[4]*y;   m[5] = m[5]*y;   m[6] = m[6]*y;   m[7] = m[7]*y;
-    m[8] = m[8]*z;   m[9] = m[9]*z;   m[10]= m[10]*z;  m[11]= m[11]*z;
+    //m[0] = m[0]*x;   m[1] = m[1]*x;   m[2] = m[2]*x;   m[3] = m[3]*x;
+    //m[4] = m[4]*y;   m[5] = m[5]*y;   m[6] = m[6]*y;   m[7] = m[7]*y;
+    //m[8] = m[8]*z;   m[9] = m[9]*z;   m[10]= m[10]*z;  m[11]= m[11]*z;
+	m[0] = m[0] * x;   m[4] = m[4] * x;   m[8] = m[8] * x;   m[12] = m[12] * x;
+	m[1] = m[1] * y;   m[5] = m[5] * y;   m[9] = m[9] * y;   m[13] = m[13] * y;
+	m[2] = m[2] * z;   m[6] = m[6] * z;   m[10] = m[10] * z;  m[14] = m[14] * z;
     return *this;
 }
 
@@ -495,17 +500,28 @@ Matrix4& Matrix4::rotateX(float angle)
 {
     float c = cosf(angle * DEG2RAD);
     float s = sinf(angle * DEG2RAD);
-    float m4 = m[4], m5 = m[5], m6 = m[6],  m7 = m[7],
-          m8 = m[8], m9 = m[9], m10= m[10], m11= m[11];
+    //float m4 = m[4], m5 = m[5], m6 = m[6],  m7 = m[7],
+    //      m8 = m[8], m9 = m[9], m10= m[10], m11= m[11];
 
-    m[4] = m4 * c + m8 *-s;
-    m[5] = m5 * c + m9 *-s;
-    m[6] = m6 * c + m10*-s;
-    m[7] = m7 * c + m11*-s;
-    m[8] = m4 * s + m8 * c;
-    m[9] = m5 * s + m9 * c;
-    m[10]= m6 * s + m10* c;
-    m[11]= m7 * s + m11* c;
+    //m[4] = m4 * c + m8 *-s;
+    //m[5] = m5 * c + m9 *-s;
+    //m[6] = m6 * c + m10*-s;
+    //m[7] = m7 * c + m11*-s;
+    //m[8] = m4 * s + m8 * c;
+    //m[9] = m5 * s + m9 * c;
+    //m[10]= m6 * s + m10* c;
+    //m[11]= m7 * s + m11* c;
+	float m1 = m[1], m5 = m[5], m9 = m[9], m13 = m[13],
+		m2 = m[2], m6 = m[6], m10 = m[10], m14 = m[14];
+
+	m[1] = m1 * c + m2 *s;
+	m[5] = m5 * c + m6 *s;
+	m[9] = m9 * c + m10*s;
+	m[13] = m13 * c + m14*s;
+	m[2] = m1 * -s + m2 * c;
+	m[6] = m5 * -s + m6 * c;
+	m[10] = m9 * -s + m10* c;
+	m[14] = m13 *-s + m14* c;
 
     return *this;
 }
@@ -514,17 +530,28 @@ Matrix4& Matrix4::rotateY(float angle)
 {
     float c = cosf(angle * DEG2RAD);
     float s = sinf(angle * DEG2RAD);
-    float m0 = m[0], m1 = m[1], m2 = m[2],  m3 = m[3],
-          m8 = m[8], m9 = m[9], m10= m[10], m11= m[11];
+    //float m0 = m[0], m1 = m[1], m2 = m[2],  m3 = m[3],
+    //      m8 = m[8], m9 = m[9], m10= m[10], m11= m[11];
 
-    m[0] = m0 * c + m8 * s;
-    m[1] = m1 * c + m9 * s;
-    m[2] = m2 * c + m10* s;
-    m[3] = m3 * c + m11* s;
-    m[8] = m0 *-s + m8 * c;
-    m[9] = m1 *-s + m9 * c;
-    m[10]= m2 *-s + m10* c;
-    m[11]= m3 *-s + m11* c;
+    //m[0] = m0 * c + m8 * s;
+    //m[1] = m1 * c + m9 * s;
+    //m[2] = m2 * c + m10* s;
+    //m[3] = m3 * c + m11* s;
+    //m[8] = m0 *-s + m8 * c;
+    //m[9] = m1 *-s + m9 * c;
+    //m[10]= m2 *-s + m10* c;
+    //m[11]= m3 *-s + m11* c;
+	float m0 = m[0], m4 = m[4], m8 = m[8], m12 = m[12],
+		m2 = m[2], m6 = m[6], m10 = m[10], m14 = m[14];
+
+	m[0] = m0 * c + m2 * -s;
+	m[4] = m4 * c + m6 * -s;
+	m[8] = m8 * c + m10* -s;
+	m[12] = m12 * c + m14* -s;
+	m[2] = m0 *s + m2 * c;
+	m[6] = m4 *s + m6 * c;
+	m[10] = m8 *s + m10* c;
+	m[14] = m12 *s + m14* c;
 
     return *this;
 }
@@ -533,17 +560,28 @@ Matrix4& Matrix4::rotateZ(float angle)
 {
     float c = cosf(angle * DEG2RAD);
     float s = sinf(angle * DEG2RAD);
-    float m0 = m[0], m1 = m[1], m2 = m[2],  m3 = m[3],
-          m4 = m[4], m5 = m[5], m6 = m[6],  m7 = m[7];
+    //float m0 = m[0], m1 = m[1], m2 = m[2],  m3 = m[3],
+    //      m4 = m[4], m5 = m[5], m6 = m[6],  m7 = m[7];
 
-    m[0] = m0 * c + m4 *-s;
-    m[1] = m1 * c + m5 *-s;
-    m[2] = m2 * c + m6 *-s;
-    m[3] = m3 * c + m7 *-s;
-    m[4] = m0 * s + m4 * c;
-    m[5] = m1 * s + m5 * c;
-    m[6] = m2 * s + m6 * c;
-    m[7] = m3 * s + m7 * c;
+    //m[0] = m0 * c + m4 *-s;
+    //m[1] = m1 * c + m5 *-s;
+    //m[2] = m2 * c + m6 *-s;
+    //m[3] = m3 * c + m7 *-s;
+    //m[4] = m0 * s + m4 * c;
+    //m[5] = m1 * s + m5 * c;
+    //m[6] = m2 * s + m6 * c;
+    //m[7] = m3 * s + m7 * c;
+	float m0 = m[0], m4 = m[4], m8 = m[8], m12 = m[12],
+		m1 = m[1], m5 = m[5], m9 = m[9], m13 = m[13];
+
+	m[0] = m0 * c + m1 *s;
+	m[4] = m4 * c + m5 *s;
+	m[8] = m8 * c + m9 *s;
+	m[12] = m12 * c + m13 *s;
+	m[1] = m0 * -s + m1 * c;
+	m[5] = m4 * -s + m5 * c;
+	m[9] = m8 * -s + m9 * c;
+	m[13] = m12 * -s + m13 * c;
 
     return *this;
 }
@@ -553,9 +591,12 @@ void Matrix4::setOrtho(float left, float right, float bottom, float top, float z
 	m[0] = 2.0f / (right - left);
 	m[5] = 2.0f / (top - bottom);
 	m[10] = -2.0f / (zFar - zNear);
-	m[12] = -(right + left) / (right - left);
-	m[13] = -(top + bottom) / (top - bottom);
-	m[14] = -(zFar + zNear) / (zFar - zNear);
+	//m[12] = -(right + left) / (right - left);
+	//m[13] = -(top + bottom) / (top - bottom);
+	//m[14] = -(zFar + zNear) / (zFar - zNear);
+	m[3] = -(right + left) / (right - left);
+	m[7] = -(top + bottom) / (top - bottom);
+	m[11] = -(zFar + zNear) / (zFar - zNear);
 }
 
 //aspect: width / height (of nearest plane)
@@ -566,8 +607,8 @@ void Matrix4::setPerspectiveY(float fovy, float aspect, float zNear, float zFar)
 	m[0] = static_cast<float>(1) / (aspect * tanHalfFovy);
 	m[5] = static_cast<float>(1) / (tanHalfFovy);
 	m[10] = -(zFar + zNear) / (zFar - zNear);
-	m[11] = -static_cast<float>(1);
-	m[14] = -(static_cast<float>(2) * zFar * zNear) / (zFar - zNear);
+	m[14] = -static_cast<float>(1);
+	m[11] = -(static_cast<float>(2) * zFar * zNear) / (zFar - zNear);
 }
 
 //aspect: height / width (of nearest plane)
@@ -575,10 +616,15 @@ void Matrix4::setPerspectiveX(float fovx, float aspect, float zNear, float zFar)
 	assert(abs(aspect - std::numeric_limits<float>::epsilon()) > static_cast<float>(0));
 	this->zero();
 	float const tanHalfFovx = tan(DEG2RAD * fovx / static_cast<float>(2));
+	//m[5] = static_cast<float>(1) / (aspect * tanHalfFovx);
+	//m[0] = static_cast<float>(1) / (tanHalfFovx);
+	//m[10] = -(zFar + zNear) / (zFar - zNear);
+	//m[11] = -static_cast<float>(1);
+	//m[14] = -(static_cast<float>(2) * zFar * zNear) / (zFar - zNear);
 	m[5] = static_cast<float>(1) / (aspect * tanHalfFovx);
 	m[0] = static_cast<float>(1) / (tanHalfFovx);
 	m[10] = -(zFar + zNear) / (zFar - zNear);
-	m[11] = -static_cast<float>(1);
-	m[14] = -(static_cast<float>(2) * zFar * zNear) / (zFar - zNear);
+	m[14] = -static_cast<float>(1);
+	m[11] = -(static_cast<float>(2) * zFar * zNear) / (zFar - zNear);
 }
 

@@ -15,11 +15,14 @@
     <ClInclude Include="camera.hpp" />
     <ClInclude Include="GLSLShader.h" />
     <ClInclude Include="Matrices.h" />
+    <ClInclude Include="MeshProcessing.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="marchingCubes_kernel.cl" />
     <None Include="scan_kernel_MP.cl" />
     <None Include="shader.frag" />
     <None Include="shader.vert" />
+    <None Include="volMesh.frag" />
+    <None Include="volMesh.vert" />
   </ItemGroup>
 </Project>

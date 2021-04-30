@@ -1,0 +1,8 @@
+ObjectType = Image
+NDims = 3
+BinaryData = True
+BinaryDataByteOrderMSB = True
+DimSize = 512 512 512
+ElementSize = 1.0 1.0 1.0
+ElementType = MET_UCHAR
+ElementDataFile = test36_20170711_5mm_CTA_512.raw

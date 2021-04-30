@@ -69,18 +69,21 @@
 #include <GL/freeglut.h>
 #endif
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/vec3.hpp> // glm::vec3
-#include <glm/vec4.hpp> // glm::vec4
-#include <glm/mat4x4.hpp> // glm::mat4
-#include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
-#include <glm/ext/matrix_clip_space.hpp> // glm::perspective
-#include <glm/ext/scalar_constants.hpp> // glm::pi
+//#include <glm/glm.hpp>
+//#include <glm/gtc/matrix_transform.hpp>
+//#include <glm/gtc/type_ptr.hpp>
+//#include <glm/vec3.hpp> // glm::vec3
+//#include <glm/vec4.hpp> // glm::vec4
+//#include <glm/mat4x4.hpp> // glm::mat4
+//#include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
+//#include <glm/ext/matrix_clip_space.hpp> // glm::perspective
+//#include <glm/ext/scalar_constants.hpp> // glm::pi
 
 #include "camera.hpp"
 #include "GLSLShader.h"
+#include "MeshProcessing.h"
+#pragma comment(lib, "MeshProcessing.lib");
+std::string gpuInfo = "Quadro P1000";
 
 #ifdef _WIN32
 #  define WINDOWS_LEAN_AND_MEAN
@@ -220,13 +223,20 @@ uint numVoxels    = 0;
 uint maxVerts     = 0;
 uint activeVoxels = 0;
 uint totalVerts   = 0;
+uint totalVertsLes = 0;
 
-float isoValue		= 0.0f;
+float isoValue		= 0.0001f;
 float dIsoValue		= 0.002f;
 
+float skinColor[] = {1.0,0.5,0.25,0.75};
+float lesColor[] = {1.0,0.0,0.0,1.0};
+
 // device data
-GLuint posVbo, normalVbo, pos_normalVbo;
-GLuint posVao;
+GLuint posVbo=0, normalVbo=0, pos_normalVbo=0;
+GLuint posVao=0;
+
+GLuint posVboLes = 0, normalVboLes = 0, pos_normalVboLes = 0;
+GLuint posVaoLes = 0;
 
 GLint  gl_Shader;
 
@@ -243,11 +253,30 @@ cl_mem d_compVoxelArray;
 
 cl_mem d_VertsHash = 0;
 
+cl_mem d_posLes = 0;
+cl_mem d_normalLes = 0;
+cl_mem d_pos_normalLes = 0;
+
+cl_mem d_volumeLes = 0;
+cl_mem d_voxelVertsLes = 0;
+cl_mem d_voxelVertsScanLes = 0;
+cl_mem d_voxelOccupiedLes = 0;
+cl_mem d_voxelOccupiedScanLes = 0;
+cl_mem d_compVoxelArrayLes;
+
+cl_mem d_VertsHashLes = 0;
+
 //host data
 std::vector<uint> h_VertsHash;
 std::vector<float> h_pos;
 std::vector<float> h_normal;
 std::vector<float> h_pos_normal;
+
+
+std::vector<uint> h_VertsHashLes;
+std::vector<float> h_posLes;
+std::vector<float> h_normalLes;
+std::vector<float> h_pos_normalLes;
 
 // tables
 cl_mem d_numVertsTable = 0;
@@ -260,10 +289,11 @@ cl_float mc_rotate[4] = {30.0, -45.0, 0.0, 0.0};
 cl_float mc_translate[4] = {0.0, 0.0, 0.0, 0.0};
 
 bool saveMeshFlag = 0;
+bool smoothFlag = 1;
 
 // toggles
 bool wireframe = false;
-bool animate = true;
+bool animate = false;
 bool lighting = true;
 bool render = true;
 bool compute = true;
@@ -286,7 +316,8 @@ const char* cpExecutableName;
 // forward declarations
 void runTest(int argc, char** argv);
 void initMC(int argc, char** argv);
-void computeIsosurface();
+void computeIsosurface(float isoValue);
+void computeIsosurfaceLes(float isoValue);
 
 bool initGL(int argc, char **argv);
 void createVBO(GLuint* vbo, unsigned int size, cl_mem &vbo_cl);
@@ -393,7 +424,7 @@ void
 launch_generateTriangles2(dim3 grid, dim3 threads,
                           cl_mem pos, cl_mem norm, cl_mem pos_norm, cl_mem compactedVoxelArray, cl_mem numVertsScanned, cl_mem volume,
                           cl_uint gridSize[4], cl_uint gridSizeShift[4], cl_uint gridSizeMask[4],
-                          cl_float voxelSize[4], cl_float UpperLeft[4], float isoValue, uint activeVoxels, uint maxVerts)
+                          cl_float voxelSize[4], cl_float UpperLeft[4], float isoValue, uint activeVoxels, uint maxVerts, cl_mem d_VertsHash)
 {
 	int k = 0;
     ciErrNum = clSetKernelArg(generateTriangles2Kernel, k++, sizeof(cl_mem), &pos);
@@ -449,6 +480,7 @@ void animation()
             isoValue = 1.0f;
             dIsoValue *= -1.0f;
         }
+		compute = true;
     }
 }
 
@@ -743,6 +775,9 @@ initMC(int argc, char** argv)
 	char *maskfilename = NULL;
 	if (shrGetCmdLineArgumentstr(argc, (const char**)argv, "mask", &maskfilename)) {
 	}
+	char *lesfilename = NULL;
+	if (shrGetCmdLineArgumentstr(argc, (const char**)argv, "les", &lesfilename)) {
+	}
 
 
     //gridSize[0] = gridSizeLog2[0];
@@ -803,7 +838,12 @@ initMC(int argc, char** argv)
     }
 	char* maskpath = shrFindFilePath(maskfilename, argv[0]);
 	if (maskpath == 0) {
-		shrLog("Error finding file '%s'\n", volumeFilename);
+		shrLog("Error finding file '%s'\n", maskfilename);
+		exit(EXIT_FAILURE);
+	}
+	char* lespath = shrFindFilePath(lesfilename, argv[0]);
+	if (lespath == 0) {
+		shrLog("Error finding file '%s'\n", lesfilename);
 		exit(EXIT_FAILURE);
 	}
 
@@ -811,24 +851,34 @@ initMC(int argc, char** argv)
 	int ori_size = gridSize[0] * gridSize[1] * (gridSize[2] - 2);
 	uchar *h_ori_volumeU = NULL;
 	uchar *h_ori_maskU = NULL;
+	uchar *h_ori_lesU = NULL;
 	float *h_ori_volumeF = NULL;
 	float* h_volumeF = NULL;
+	float* h_ori_lesF = NULL;
+	float* h_lesF = NULL;
 	h_ori_volumeF = (float*)malloc(ori_size * sizeof(float));
 	h_volumeF = (float*)malloc(size * sizeof(float));
+	h_ori_lesF = (float*)malloc(ori_size * sizeof(float));
+	h_lesF = (float*)malloc(size * sizeof(float));
 
 	switch (rawType) {
 	case(UCHAR8): {
 		h_ori_volumeU = loadRawFile(path, ori_size);
 		h_ori_maskU = loadRawFile(maskpath, ori_size);
+		h_ori_lesU = loadRawFile(lespath, ori_size);
 		oclCheckErrorEX(h_ori_volumeU != NULL, true, pCleanup);
 		shrLog(" Raw file data loaded...\n\n");
 		for (size_t i = 0; i < ori_size; ++i) {
 			float val = (float)h_ori_volumeU[i] * (float)(h_ori_maskU[i] / 255) / 255.0;
 			//float val = (float)(h_ori_volumeU[i]) / 255.0;
 			h_ori_volumeF[i] = val;// / 255.0 - 0.5;
+
+			float lesval = (float)h_ori_volumeU[i] * (float)(h_ori_lesU[i] / 255) / 255.0;
+			h_ori_lesF[i] = lesval;
 		}
 		free(h_ori_volumeU);
 		free(h_ori_maskU);
+		free(h_ori_lesU);
 		break;
 	}
 	case(FLOAT32): {
@@ -855,6 +905,24 @@ initMC(int argc, char** argv)
 		h_volumeF[gridSize[0] * gridSize[1] * (gridSize[2] - 1) + i] = fmin;
 	}
 	memcpy(h_volumeF + gridSize[0] * gridSize[1], h_ori_volumeF, ori_size * sizeof(float));
+
+	fmin = h_ori_lesF[0]; fmax = h_ori_lesF[0];
+	for (size_t i = 0; i < ori_size; ++i) {
+		if (h_ori_lesF[i] > fmax) fmax = h_ori_lesF[i];
+		if (h_ori_lesF[i] < fmin) fmin = h_ori_lesF[i];
+	}
+
+	for (int i = 0; i < gridSize[0] * gridSize[1]; ++i) {
+		h_lesF[i] = fmin;
+	}
+	for (int i = 0; i < gridSize[0] * gridSize[1]; ++i) {
+		h_lesF[gridSize[0] * gridSize[1] * (gridSize[2] - 1) + i] = fmin;
+	}
+	memcpy(h_lesF + gridSize[0] * gridSize[1], h_ori_lesF, ori_size * sizeof(float));
+
+
+
+
 	//memcpy(h_volumeF, h_ori_volumeF + gridSize[0] * gridSize[1], gridSize[0] * gridSize[1] * sizeof(float));
 	//memcpy(h_volumeF + gridSize[0] * gridSize[1] * (gridSize[2]-1), h_ori_volumeF + gridSize[0] * gridSize[1] * (gridSize[2] - 3), gridSize[0] * gridSize[1] * sizeof(float));
 
@@ -877,34 +945,60 @@ initMC(int argc, char** argv)
     cl_image_format volumeFormat;
     volumeFormat.image_channel_order = CL_R;
     volumeFormat.image_channel_data_type = CL_FLOAT;
+
     d_volume = clCreateImage3D(cxGPUContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, &volumeFormat, 
                                     gridSize[0], gridSize[1], gridSize[2],
                                     gridSize[0]*4, gridSize[0] * gridSize[1]*4,
 								h_volumeF, &ciErrNum);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+
+	d_volumeLes = clCreateImage3D(cxGPUContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, &volumeFormat,
+		gridSize[0], gridSize[1], gridSize[2],
+		gridSize[0] * 4, gridSize[0] * gridSize[1] * 4,
+		h_lesF, &ciErrNum);
+	oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+
 	free(h_ori_volumeF);
 	free(h_volumeF);
+	free(h_lesF);
+
 
     // create VBOs
     if( !bQATest) {
         createVBO(&posVbo, maxVerts*sizeof(float)*4, d_pos);
         createVBO(&normalVbo, maxVerts*sizeof(float)*4, d_normal);
-		
 		createVBO(&pos_normalVbo, maxVerts * sizeof(float) * 4 * 2, d_pos_normal);
+
+		createVBO(&posVboLes, maxVerts * sizeof(float) * 4, d_posLes);
+		createVBO(&normalVboLes, maxVerts * sizeof(float) * 4, d_normalLes);
+		createVBO(&pos_normalVboLes, maxVerts * sizeof(float) * 4 * 2, d_pos_normalLes);
     }
 
 	glutReportErrors();
 	// shader:
+	GLuint posAttLoc = shader.getAttribute("aPos");
+	GLuint normalAttLoc = shader.getAttribute("aNormal");
+
 	glGenVertexArrays(1, &posVao);
 	glBindVertexArray(posVao);
-	//glBindBuffer(GL_ARRAY_BUFFER, posVbo);
-	//glEnableVertexAttribArray(shader["vVertex"]);
-	//glVertexAttribPointer(shader["vVertex"], 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
-	glBindBuffer(GL_ARRAY_BUFFER, pos_normalVbo);
-	glEnableVertexAttribArray(shader["aPos"]);
-	glVertexAttribPointer(shader["aPos"], 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(0));
-	glEnableVertexAttribArray(shader["aNormal"]);
-	glVertexAttribPointer(shader["aNormal"], 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4*sizeof(float)));
+	glBindBuffer(GL_ARRAY_BUFFER, posVbo);
+	glEnableVertexAttribArray(posAttLoc);
+	glVertexAttribPointer(posAttLoc, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(0));
+	glBindBuffer(GL_ARRAY_BUFFER, normalVbo);
+	glEnableVertexAttribArray(normalAttLoc);
+	glVertexAttribPointer(normalAttLoc, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(0));
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	glutReportErrors();
+
+	glGenVertexArrays(1, &posVaoLes);
+	glBindVertexArray(posVaoLes);
+	glBindBuffer(GL_ARRAY_BUFFER, posVboLes);
+	glEnableVertexAttribArray(posAttLoc);
+	glVertexAttribPointer(posAttLoc, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(0));
+	glBindBuffer(GL_ARRAY_BUFFER, normalVboLes);
+	glEnableVertexAttribArray(normalAttLoc);
+	glVertexAttribPointer(normalAttLoc, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(0));
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 	glutReportErrors();
@@ -926,6 +1020,19 @@ initMC(int argc, char** argv)
     d_compVoxelArray = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, memSize, 0, &ciErrNum);
     oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 	d_VertsHash = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, sizeof(uint)*maxVerts, 0, &ciErrNum);
+	oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+
+	d_voxelVertsLes = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, memSize, 0, &ciErrNum);
+	oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+	d_voxelVertsScanLes = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, memSize, 0, &ciErrNum);
+	oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+	d_voxelOccupiedLes = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, memSize, 0, &ciErrNum);
+	oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+	d_voxelOccupiedScanLes = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, memSize, 0, &ciErrNum);
+	oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+	d_compVoxelArrayLes = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, memSize, 0, &ciErrNum);
+	oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+	d_VertsHashLes = clCreateBuffer(cxGPUContext, CL_MEM_READ_WRITE, sizeof(uint)*maxVerts, 0, &ciErrNum);
 	oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
 }
 
@@ -1037,7 +1144,7 @@ runTest(int argc, char** argv)
 //! Run the OpenCL part of the computation
 ////////////////////////////////////////////////////////////////////////////////
 void
-computeIsosurface()
+computeIsosurface(float isoValue)
 {
     int threads = 128;
     dim3 grid(numVoxels / threads, 1, 1);
@@ -1116,9 +1223,9 @@ computeIsosurface()
                                             d_voxelVertsScan, d_volume, 
                                             gridSize, gridSizeShift, gridSizeMask, 
                                             voxelSize, UpperLeft, isoValue, activeVoxels,
-                              maxVerts);
+                              maxVerts, d_VertsHash);
 
-
+	int new_totalVerts = totalVerts;
 	h_pos.resize(totalVerts * 4);
 	h_normal.resize(totalVerts * 4);
 	h_pos_normal.resize(totalVerts * 4 * 2);
@@ -1134,6 +1241,46 @@ computeIsosurface()
 		saveMeshFlag = 0;
 	}
 
+	// mesh filtering:
+	MeshProc::MeshData inMesh, inMesh_s, smMesh;
+	int nF = totalVerts/ 3;
+	int mp_maxF = 1e6;
+	bool mp_flag = (nF < mp_maxF);
+	if (smoothFlag && !mp_flag) printf("Warning: too much faces, can't do mesh smoothing!!\n");
+	std::vector<float> h_pos_sm = h_pos;
+	std::vector<float> h_normal_sm = h_normal;
+	std::vector<uint> h_VertsHash_sm = h_VertsHash;
+	MC_HELPER::getCompactMeshEigen(h_pos, h_VertsHash, h_normal, inMesh.V, inMesh.F, inMesh.N, inMesh.FN);
+	if (smoothFlag && mp_flag) {
+		std::vector<float> h_pos_sm = h_pos;
+		std::vector<float> h_normal_sm = h_normal;
+		std::vector<uint> h_VertsHash_sm = h_VertsHash;
+		MC_HELPER::getCompactMeshEigen(h_pos, h_VertsHash, h_normal, inMesh.V, inMesh.F, inMesh.N, inMesh.FN);
+		//MeshProc::writeMesh("origin.obj", inMesh);
+
+		// clean mesh: remove small regions
+		MeshProc::MeshData cleanMesh = inMesh;
+		//MeshProc::RemoveSmallRegions(inMesh, cleanMesh, 1e-3);
+
+		//gpuInfostd::string gpuInfo = CCarbonMed3DRecon::getGPUInfo();
+		MeshProc::UniformLaplacianSmoothing(cleanMesh, smMesh, 10);
+		//MeshProc::CotangentLaplacianSmoothing(cleanMesh, smMesh, 3);
+		//MeshProc::BilateralNormalSmoothingGPU(cleanMesh, smMesh, 20, 10, true, gpuInfo);
+
+		MC_HELPER::getArrayFromCompactMesh(h_pos_sm, h_normal_sm, smMesh.V, smMesh.F);
+		new_totalVerts = smMesh.F.rows() * 3;
+		clEnqueueWriteBuffer(cqCommandQueue, d_pos, CL_TRUE, 0, new_totalVerts * 4 * sizeof(float), h_pos_sm.data(), 0, 0, 0);
+		clEnqueueWriteBuffer(cqCommandQueue, d_normal, CL_TRUE, 0, new_totalVerts * 4 * sizeof(float), h_normal_sm.data(), 0, 0, 0);
+
+
+		// resize
+		totalVerts = new_totalVerts;
+		uint newSize = totalVerts * 4 * sizeof(float);
+		uint copySize = totalVerts * 4 * sizeof(float);
+
+	}
+
+
 
 
 	if( g_glInterop ) {
@@ -1144,9 +1291,153 @@ computeIsosurface()
 		clFinish( cqCommandQueue );
 	} 
 
-
-
 }
+
+void computeIsosurfaceLes(float isoValue) {
+	int threads = 128;
+	dim3 grid(numVoxels / threads, 1, 1);
+	// get around maximum grid size of 65535 in each dimension
+	//if (grid.x > 65535) {
+	//    grid.y = grid.x / 32768;
+	//    grid.x = 32768;
+	//}
+
+	// calculate number of vertices need per voxel
+	launch_classifyVoxel(grid, threads,
+		d_voxelVertsLes, d_voxelOccupiedLes, d_volumeLes,
+		gridSize, gridSizeShift, gridSizeMask,
+		numVoxels, voxelSize, isoValue);
+
+	// scan voxel occupied array
+	MeshProc::scanApple::ScanAPPLEProcess(d_voxelOccupiedScanLes, d_voxelOccupiedLes, numVoxels); //openclScan(d_voxelOccupiedScan, d_voxelOccupied, numVoxels);
+
+																							// read back values to calculate total number of non-empty voxels
+																							// since we are using an exclusive scan, the total is the last value of
+																							// the scan result plus the last value in the input array
+	{
+		uint lastElement, lastScanElement;
+
+		clEnqueueReadBuffer(cqCommandQueue, d_voxelOccupiedLes, CL_TRUE, (numVoxels - 1) * sizeof(uint), sizeof(uint), &lastElement, 0, 0, 0);
+		clEnqueueReadBuffer(cqCommandQueue, d_voxelOccupiedScanLes, CL_TRUE, (numVoxels - 1) * sizeof(uint), sizeof(uint), &lastScanElement, 0, 0, 0);
+
+		activeVoxels = lastElement + lastScanElement;
+	}
+
+	if (activeVoxels == 0) {
+		// return if there are no full voxels
+		totalVertsLes = 0;
+		return;
+	}
+
+	//printf("activeVoxels = %d\n", activeVoxels);
+
+	// compact voxel index array
+	launch_compactVoxels(grid, threads, d_compVoxelArrayLes, d_voxelOccupiedLes, d_voxelOccupiedScanLes, numVoxels);
+
+
+	// scan voxel vertex count array
+	MeshProc::scanApple::ScanAPPLEProcess(d_voxelVertsScanLes, d_voxelVertsLes, numVoxels);//openclScan(d_voxelVertsScan, d_voxelVerts, numVoxels);
+
+																					 // readback total number of vertices
+	{
+		uint lastElement, lastScanElement;
+		clEnqueueReadBuffer(cqCommandQueue, d_voxelVertsLes, CL_TRUE, (numVoxels - 1) * sizeof(uint), sizeof(uint), &lastElement, 0, 0, 0);
+		clEnqueueReadBuffer(cqCommandQueue, d_voxelVertsScanLes, CL_TRUE, (numVoxels - 1) * sizeof(uint), sizeof(uint), &lastScanElement, 0, 0, 0);
+
+		totalVertsLes = lastElement + lastScanElement;
+	}
+
+	//printf("totalVerts = %d\n", totalVerts);
+
+
+	cl_mem interopBuffers[] = { d_posLes, d_normalLes, d_pos_normalLes };
+
+	// generate triangles, writing to vertex buffers
+	if (g_glInterop) {
+		// Acquire PBO for OpenCL writing
+		glFlush();
+		ciErrNum = clEnqueueAcquireGLObjects(cqCommandQueue, 3, interopBuffers, 0, 0, 0);
+		oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+	}
+
+	dim3 grid2((int)ceil(activeVoxels / (float)NTHREADS), 1, 1);
+
+	//while(grid2.x > 65535) {
+	//    grid2.x/=2;
+	//    grid2.y*=2;
+	//}
+	launch_generateTriangles2(grid2, NTHREADS, d_posLes, d_normalLes, d_pos_normalLes,
+		d_compVoxelArrayLes,
+		d_voxelVertsScanLes, d_volumeLes,
+		gridSize, gridSizeShift, gridSizeMask,
+		voxelSize, UpperLeft, isoValue, activeVoxels,
+		maxVerts, d_VertsHashLes);
+
+	int new_totalVerts = totalVertsLes;
+	h_posLes.resize(totalVertsLes * 4);
+	h_normalLes.resize(totalVertsLes * 4);
+	h_pos_normalLes.resize(totalVertsLes * 4 * 2);
+	h_VertsHashLes.resize(totalVertsLes);
+	dumpBuffer(d_posLes, h_posLes.data(), totalVertsLes * 4);
+	dumpBuffer(d_normalLes, h_normalLes.data(), totalVertsLes * 4);
+	dumpBuffer(d_pos_normalLes, h_pos_normalLes.data(), totalVertsLes * 4 * 2);
+	dumpBuffer(d_VertsHashLes, h_VertsHashLes.data(), totalVertsLes);
+	std::string filename;
+	filename = std::string(volumeFilename) + "_les_" + std::to_string(isoValue) + ".obj";
+	if (saveMeshFlag) {
+		MC_HELPER::saveMesh(filename, h_posLes, h_normalLes, h_VertsHashLes);
+		saveMeshFlag = 0;
+	}
+
+	// mesh filtering:
+	MeshProc::MeshData inMesh, inMesh_s, smMesh;
+	int nF = totalVertsLes / 3;
+	int mp_maxF = 1e6;
+	bool mp_flag = (nF < mp_maxF);
+	if (smoothFlag && !mp_flag) printf("Warning: too much faces, can't do mesh smoothing!!\n");
+	MC_HELPER::getCompactMeshEigen(h_posLes, h_VertsHashLes, h_normalLes, inMesh.V, inMesh.F, inMesh.N, inMesh.FN);
+	if (smoothFlag && mp_flag) {
+		std::vector<float> h_pos_sm = h_posLes;
+		std::vector<float> h_normal_sm = h_normalLes;
+		std::vector<uint> h_VertsHash_sm = h_VertsHashLes;
+		MC_HELPER::getCompactMeshEigen(h_posLes, h_VertsHashLes, h_normalLes, inMesh.V, inMesh.F, inMesh.N, inMesh.FN);
+		//MeshProc::writeMesh("origin.obj", inMesh);
+
+		// clean mesh: remove small regions
+		MeshProc::MeshData cleanMesh = inMesh;
+		//MeshProc::RemoveSmallRegions(inMesh, cleanMesh, 1e-3);
+
+		//gpuInfostd::string gpuInfo = CCarbonMed3DRecon::getGPUInfo();
+		MeshProc::UniformLaplacianSmoothing(cleanMesh, smMesh, 10);
+		//MeshProc::CotangentLaplacianSmoothing(cleanMesh, smMesh, 3);
+		//MeshProc::BilateralNormalSmoothingGPU(cleanMesh, smMesh, 20, 10, true, gpuInfo);
+
+		MC_HELPER::getArrayFromCompactMesh(h_pos_sm, h_normal_sm, smMesh.V, smMesh.F);
+		new_totalVerts = smMesh.F.rows() * 3;
+		clEnqueueWriteBuffer(cqCommandQueue, d_posLes, CL_TRUE, 0, new_totalVerts * 4 * sizeof(float), h_pos_sm.data(), 0, 0, 0);
+		clEnqueueWriteBuffer(cqCommandQueue, d_normalLes, CL_TRUE, 0, new_totalVerts * 4 * sizeof(float), h_normal_sm.data(), 0, 0, 0);
+
+
+		// resize
+		totalVertsLes = new_totalVerts;
+		uint newSize = totalVertsLes * 4 * sizeof(float);
+		uint copySize = totalVertsLes * 4 * sizeof(float);
+
+	}
+
+
+
+
+	if (g_glInterop) {
+		// Transfer ownership of buffer back from CL to GL  
+		ciErrNum = clEnqueueReleaseGLObjects(cqCommandQueue, 3, interopBuffers, 0, 0, 0);
+		oclCheckErrorEX(ciErrNum, CL_SUCCESS, pCleanup);
+
+		clFinish(cqCommandQueue);
+	}
+}
+
+
 
 //// shader for displaying floating-point texture
 //static const char *shader_code = 
@@ -1238,23 +1529,28 @@ initGL(int argc, char **argv)
 
 	GL_CHECK_ERRORS
 	//load shader
-	shader.LoadFromFile(GL_VERTEX_SHADER, "shader.vert");
-	shader.LoadFromFile(GL_FRAGMENT_SHADER, "shader.frag");
+	//shader.LoadFromFile(GL_VERTEX_SHADER, "shader.vert");
+	//shader.LoadFromFile(GL_FRAGMENT_SHADER, "shader.frag");
+	shader.LoadFromFile(GL_VERTEX_SHADER, "volMesh.vert");
+	shader.LoadFromFile(GL_FRAGMENT_SHADER, "volMesh.frag");
 	//compile and link shader
 	shader.CreateAndLinkProgram();
 	shader.Use();
 	//add shader attribute and uniforms
 	//shader.AddAttribute("vVertex");
 	//shader.AddUniform("MVP");
-	shader.AddAttribute("aPos");
-	shader.AddAttribute("aNormal");
-	shader.AddUniform("model");
-	shader.AddUniform("view");
-	shader.AddUniform("projection");
-	shader.AddUniform("lightPos");
-	shader.AddUniform("viewPos");
-	shader.AddUniform("lightColor");
-	shader.AddUniform("objectColor");
+	//shader.AddAttribute("aPos");
+	//shader.AddAttribute("aNormal");
+	//shader.AddUniform("model");
+	//shader.AddUniform("view");
+	//shader.AddUniform("projection");
+	//shader.AddUniform("lightPos");
+	//shader.AddUniform("viewPos");
+	//shader.AddUniform("lightColor");
+	//shader.AddUniform("objectColor");
+
+
+
 
 	shader.UnUse();
 
@@ -1330,38 +1626,146 @@ void renderIsosurface()
 ////////////////////////////////////////////////////////////////////////////////
 // Render isosurface geometry from the vertex buffers using shaders!
 ////////////////////////////////////////////////////////////////////////////////
+void SetLightsForRendering_shader() {
+	float lightPos0[] = { 0.0f, 0.0f, -1.0f, 0.0f };
+	float lightPos1[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	float lightPos2[] = { 1.0f, 0.0f, 0.0f, 0.0f };
+	float lightPos3[] = { -1.0f, 0.0f, 0.0f, 0.0f };
+	float lightPos4[] = { 0.0, -1.0, 0.0, 0.0f };
+	float lightPos5[] = { 0.0, 1.0, 0.0, 0.0f };
+
+	float lightblack[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	float lightwhite[] = { 0.8f, 0.8f, 0.8f, 1.0f };
+	float lightambient[] = { 0.1f, 0.1f, 0.1f, 1.0f };
+	float lightdiffuse[] = { 0.3f, 0.3f, 0.3f, 1.0f };
+	float lightspecular[] = { 0.3f, 0.3f, 0.3f, 1.0f };
+
+	int lightNum = 2;
+	//glUniform1ui(m_volShader("lightNum"), lightNum);
+	shader.setInt("lightNum", lightNum);
+	// light 0
+	//glUniform4fv(m_volShader("lights[0].position"), 1, lightPos0);
+	//glUniform4fv(m_volShader("lights[0].ambient"), 1, lightwhite);
+	//glUniform4fv(m_volShader("lights[0].diffuse"), 1, lightwhite);
+	//glUniform4fv(m_volShader("lights[0].specular"), 1, lightspecular);
+	shader.setVec4("lights[0].position", lightPos0);
+	shader.setVec4("lights[0].ambient", lightwhite);
+	shader.setVec4("lights[0].diffuse", lightwhite);
+	shader.setVec4("lights[0].specular", lightspecular);
+	// light 1
+	//glUniform4fv(m_volShader("lights[1].position"), 1, lightPos1);
+	//glUniform4fv(m_volShader("lights[1].ambient"), 1, lightwhite);
+	//glUniform4fv(m_volShader("lights[1].diffuse"), 1, lightwhite);
+	//glUniform4fv(m_volShader("lights[1].specular"), 1, lightspecular);
+	shader.setVec4("lights[1].position", lightPos1);
+	shader.setVec4("lights[1].ambient", lightwhite);
+	shader.setVec4("lights[1].diffuse", lightwhite);
+	shader.setVec4("lights[1].specular", lightspecular);
+}
+
+void SetRenderFeatureSkin_shader() {
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	//glEnable(GL_DEPTH_TEST);
+	glDisable(GL_DEPTH_TEST);
+	int wireframe = false;
+	glPolygonMode(GL_FRONT, wireframe ? GL_LINE : GL_FILL);
+
+	float black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	float white[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	float ambient[] = { 0.1f, 0.1f, 0.1f, 1.0f };
+	float diffuse[] = { 0.8f, 0.8f, 0.8f, 1.0f };
+	Vector4 lightPos(0.0f, 0.0f, -1.0f, 0.0f);
+
+	Matrix4 mv = cam.getViewMat4() * modelMat;
+	lightPos = mv * lightPos;
+
+	shader.setVec4("material.ambient", ambient);
+	shader.setVec4("material.diffuse", diffuse);
+	shader.setVec4("material.specular", black);
+	shader.setFloat("material.shiness", 5.0f);
+
+	shader.setVec4("lights[0].position", lightPos.get());
+	shader.setVec4("lights[0].ambient", black);
+	shader.setVec4("lights[0].diffuse", diffuse);
+	shader.setVec4("lights[0].specular", white);
+
+	float paintColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	shader.setVec4("paintColor", skinColor);
+}
+
+void SetRenderFeatureOrgan_shader() {
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_DEPTH_TEST);
+	int wireframe = false;
+	glPolygonMode(GL_FRONT, wireframe ? GL_LINE : GL_FILL);
+
+	float black[] = { 0.5f, 0.5f, 0.5f, 1.0f };
+	GLfloat afAmbientWhite[] = { 0.25, 0.25, 0.25, 1.00 };   // ÖÜÎ§ »·ÈÆ °× 
+	GLfloat afAmbientRed[] = { 0.25, 0.00, 0.00, 1.00 };     // ÖÜÎ§ »·ÈÆ ºì
+	GLfloat afDiffuseWhite[] = { 0.75, 0.75, 0.75, 1.00 };   // ÂþÉä °×
+	GLfloat afDiffuseRed[] = { 0.75, 0.00, 0.00, 0.00 };     // ÂþÉä ºì
+	GLfloat afSpecularRed[] = { 1.00, 0.25, 0.25, 1.00 };    // ·´Éä ºì
+
+	shader.setVec4("material.ambient", afAmbientRed);
+	shader.setVec4("material.diffuse", lesColor);
+	shader.setVec4("material.specular", black);
+	shader.setFloat("material.shiness", 5.0f);
+
+	float paintColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	shader.setVec4("paintColor", paintColor);
+}
+
 void renderIsosurface_shader()
 {
-	glPolygonMode(GL_FRONT_AND_BACK, wireframe? GL_LINE:GL_FILL);
+	//bind the shader
+	shader.Use();
+	SetLightsForRendering_shader();
+	
+	//SetRenderFeatureOrgan_shader();
+	glPolygonMode(GL_FRONT, wireframe? GL_LINE:GL_FILL);
 
 	//clear the colour and depth buffer
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	//bind the shader
-	shader.Use();
+
 	//mvpMat = cam.getProjMatrixData() * cam.getViewMatrixData() * modelMat;
 	mvpMat = cam.getProjMat4() * cam.getViewMat4() * modelMat;
 	//pass the shader uniform
 	//glUniformMatrix4fv(shader("MVP"), 1, GL_FALSE, glm::value_ptr(mvpMat));
-	glUniformMatrix4fv(shader("projection"), 1, GL_FALSE, cam.getProjMatrixDataPtr());
-	glUniformMatrix4fv(shader("view"), 1, GL_FALSE, cam.getViewMatrixDataPtr());
-	glUniformMatrix4fv(shader("model"), 1, GL_FALSE, modelMat.get());
-	glm::vec3 lightPos(0.0, 0.0, 2.0);
-	glUniform3fv(shader("lightPos"), 1, glm::value_ptr(lightPos));
-	glm::vec3 viewPos(0.0, 0.0, 0.0);
-	glUniform3fv(shader("viewPos"), 1, glm::value_ptr(viewPos));
-	glm::vec3 lightColor(1.0, 1.0, 1.0);
-	glUniform3fv(shader("lightColor"), 1, glm::value_ptr(lightColor));
-	glm::vec3 objectColor(1.0, 0.0, 0.0);
-	glUniform3fv(shader("objectColor"), 1, glm::value_ptr(objectColor));
+	//glUniformMatrix4fv(shader("projection"), 1, GL_FALSE, cam.getProjMatrixDataTransPosePtr());
+	//glUniformMatrix4fv(shader("view"), 1, GL_FALSE, cam.getViewMatrixDataTransPosePtr());
+	//glUniformMatrix4fv(shader("model"), 1, GL_FALSE, modelMat.getTranspose());
+	shader.setMat4("projection", cam.getProjMatrixDataTransPosePtr());
+	shader.setMat4("view", cam.getViewMatrixDataTransPosePtr());
+	shader.setMat4("model", modelMat.getTranspose());
+	//glm::vec3 lightPos(0.0, 0.0, 2.0);
+	//glUniform3fv(shader("lightPos"), 1, glm::value_ptr(lightPos));
+	//glm::vec3 viewPos(0.0, 0.0, 0.0);
+	//glUniform3fv(shader("viewPos"), 1, glm::value_ptr(viewPos));
+	//glm::vec3 lightColor(1.0, 1.0, 1.0);
+	//glUniform3fv(shader("lightColor"), 1, glm::value_ptr(lightColor));
+	//glm::vec3 objectColor(1.0, 0.0, 0.0);
+	//glUniform3fv(shader("objectColor"), 1, glm::value_ptr(objectColor));
 	//draw triangle
-	glBindVertexArray(posVao); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+
+
+	SetRenderFeatureOrgan_shader();
+	glBindVertexArray(posVaoLes); 
+	glDrawArrays(GL_TRIANGLES, 0, totalVertsLes);
+	glBindVertexArray(0);
+
+	SetRenderFeatureSkin_shader();
+	glBindVertexArray(posVao);
 	glDrawArrays(GL_TRIANGLES, 0, totalVerts);
+	glBindVertexArray(0);
+
 	//unbind the shader
 	shader.UnUse();
 
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
 
 	//swap front and back buffers to show the rendered result
 	//glutSwapBuffers();
@@ -1379,7 +1783,9 @@ display()
 	glutReportErrors();
     // run CUDA kernel to generate geometry
     if (compute) {
-        computeIsosurface();
+        computeIsosurface(isoValue);
+		computeIsosurfaceLes(isoValue);
+		compute = false;
     }
 	glutReportErrors();
 	glEnable(GL_NORMALIZE);
@@ -1420,16 +1826,16 @@ display()
 			////for (int i = 0; i < 16; ++i) printf("%f ", mat[i]);
 			////for (int i = 0; i < 16; ++i) printf("%f ", glm::value_ptr(modelMat)[i]);
 
-			renderIsosurface();
+			//renderIsosurface();
 			////renderIsosurface_shader();
 
 			glPopMatrix();
 
 			glLoadIdentity();
 			//glMultMatrixf(cam.getProjMatrixDataPtr());
-			glMultMatrixf(cam.getViewMatrixDataPtr());
-			glMultMatrixf(modelMat.get());
-			renderIsosurface();
+			glMultMatrixf(cam.getViewMatrixDataTransPosePtr());
+			glMultMatrixf(modelMat.getTranspose());
+			//renderIsosurface();
 
 			renderIsosurface_shader();
 			
@@ -1509,9 +1915,10 @@ keyboard(unsigned char key, int /*x*/, int /*y*/)
     printf("occupancy: %d / %d = %.2f%%\n", 
            activeVoxels, numVoxels, activeVoxels*100.0f / (float) numVoxels);
 
-    if (!compute) {
-        computeIsosurface();        
-    }
+	if (!compute) {
+		compute = 1;
+		//computeIsosurface(isoValue);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1547,8 +1954,8 @@ void motion(int x, int y)
 		cam.addRotate(dy, dx, 0.0f);
     } 
 	else if (mouse_buttons==2) {
-        mc_translate[0] += dx * 0.005f;
-        mc_translate[1] -= dy * 0.005f;
+        mc_translate[0] -= dx * 0.005f;
+        mc_translate[1] += dy * 0.005f;
 		if (mc_translate[0] > 1.5)   mc_translate[0] = 1.5;
 		if (mc_translate[0] < -1.5)  mc_translate[0] = -1.5;
 		if (mc_translate[1] > 1.5)   mc_translate[1] = 1.5;
@@ -1606,7 +2013,7 @@ void reshape(int w, int h)
 
 	//cam.setZplane(mc_halfBound[0] * 0.5, cameraDistance + 2.0*mc_halfBound[0]);
 	cam.setWindowSize(w, h);
-	glLoadMatrixf(cam.getProjMatrixDataPtr());
+	glLoadMatrixf(cam.getProjMatrixDataTransPosePtr());
 
 
     //glMatrixMode(GL_PROJECTION);
@@ -1636,7 +2043,7 @@ void TestNoGL()
         
     
     // Warmup
-    computeIsosurface();
+    computeIsosurface(isoValue);
     clFinish(cqCommandQueue);
     
     // Start timer 0 and process n loops on the GPU 
@@ -1645,7 +2052,7 @@ void TestNoGL()
 
     for (int i = 0; i < nIter; i++)
     {
-        computeIsosurface();
+        computeIsosurface(isoValue);
     }
     clFinish(cqCommandQueue);
     

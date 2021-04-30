@@ -86,6 +86,9 @@ void GLSLShader::UnUse() {
 void GLSLShader::AddAttribute(const string& attribute) {
 	_attributeList[attribute]= glGetAttribLocation(_program, attribute.c_str());	
 }
+GLuint GLSLShader::getAttribute(const string& attribute) {
+	return  glGetAttribLocation(_program, attribute.c_str());
+}
 
 //An indexer that returns the location of the attribute
 GLuint GLSLShader::operator [](const string& attribute) {

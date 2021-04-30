@@ -187,7 +187,7 @@
     <Link>
       <AdditionalDependencies>oclUtils64.lib;shrUtils64.lib;glew32.lib;OpenCL.lib;freeglut.lib</AdditionalDependencies>
       <OutputFile>$(OutDir)/oclMarchingCubes.exe</OutputFile>
-      <AdditionalLibraryDirectories>$(CudaToolkitDir)/lib/$(Platform);../../common/lib/$(Platform);../../../shared/lib/$(Platform);D:\workingProject\3DRendering-master\RenderLib\3rdParty\OpenCL\OpenCL\common\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(CudaToolkitDir)/lib/$(Platform);../../common/lib/$(Platform);../../../shared/lib/$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -208,6 +208,8 @@
     <None Include="scan_kernel_MP.cl" />
     <None Include="shader.frag" />
     <None Include="shader.vert" />
+    <None Include="volMesh.frag" />
+    <None Include="volMesh.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GLSLShader.cpp" />
@@ -222,6 +224,7 @@
     <ClInclude Include="GLSLShader.h" />
     <ClInclude Include="Matrices.h" />
     <ClInclude Include="mc_helper.h" />
+    <ClInclude Include="MeshProcessing.h" />
     <ClInclude Include="ScanApple.h" />
     <ClInclude Include="tables.h" />
   </ItemGroup>
